@@ -3,71 +3,62 @@
 @tailwind utilities;
 
 :root {
-  --paper: #e8dcc0;
-  --paper-dim: #b8a986;
-  --ink-deep: #08060a;
-  --ink-warm: #15110a;
-  --gold: #c69b3d;
-  --gold-leaf: #e6bf6a;
-  --oxblood: #7a1f1f;
-  --verdigris: #3d6a5a;
-  --bruise: #5d4a73;
+  --paper: #f7f4ea;
+  --paper-dim: #b8b09a;
+  --ink-deep: #0e1726;
+  --ink-warm: #162236;
+  --gold: #ffc857;
+  --gold-leaf: #ffd97a;
+  --oxblood: #ff6b6b;
+  --verdigris: #3ed598;
+  --bruise: #a78bfa;
 }
 
 html, body {
   background:
-    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(198,155,61,0.08), transparent 70%),
-    radial-gradient(ellipse 60% 80% at 100% 100%, rgba(122,31,31,0.10), transparent 70%),
-    radial-gradient(ellipse 60% 80% at 0% 100%, rgba(61,106,90,0.08), transparent 70%),
-    linear-gradient(180deg, #0d0a07 0%, #08060a 100%);
+    radial-gradient(ellipse 90% 60% at 50% -10%, rgba(255,200,87,0.10), transparent 70%),
+    radial-gradient(ellipse 60% 80% at 100% 100%, rgba(167,139,250,0.10), transparent 70%),
+    radial-gradient(ellipse 60% 80% at 0% 100%, rgba(62,213,152,0.08), transparent 70%),
+    linear-gradient(180deg, #162236 0%, #0e1726 100%);
   color: var(--paper);
   min-height: 100vh;
-  font-feature-settings: "liga", "dlig", "onum";
 }
 
 body {
-  font-family: var(--font-body), Georgia, serif;
+  font-family: var(--font-body), system-ui, sans-serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-/* Aged-paper grain laid over everything via a body pseudo. SVG noise data URI. */
-.parchment-noise::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  z-index: 1;
-  opacity: 0.10;
-  mix-blend-mode: overlay;
-  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.91   0 0 0 0 0.86   0 0 0 0 0.75   0 0 0 0.55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
-}
-
 /* --- Type rhythm --- */
-.font-display { font-family: var(--font-display), Georgia, serif; }
-.font-body    { font-family: var(--font-body), Georgia, serif; }
+.font-display { font-family: var(--font-display), system-ui, sans-serif; font-weight: 600; letter-spacing: -0.01em; }
+.font-body    { font-family: var(--font-body), system-ui, sans-serif; }
 .font-mono    { font-family: var(--font-mono), ui-monospace, monospace; }
 
 .smallcaps {
-  font-variant: small-caps;
-  letter-spacing: 0.18em;
-  text-transform: lowercase;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  font-weight: 600;
 }
 .allcaps {
-  letter-spacing: 0.32em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
 }
 .dropcap::first-letter {
-  font-family: var(--font-display), Georgia, serif;
-  font-weight: 600;
+  font-family: var(--font-display), system-ui, sans-serif;
+  font-weight: 700;
   float: left;
-  font-size: 3.4em;
+  font-size: 3.2em;
   line-height: 0.9;
-  padding: 0.08em 0.12em 0 0;
+  padding: 0.05em 0.12em 0 0;
   color: var(--gold-leaf);
 }
 
-/* --- Ornament rules --- */
+/* Make occult-era italics render as normal weight (Fredoka has no italic).
+   Pages set lots of italic={true} that read badly here; normalize. */
+.font-display.italic, em.font-display, i.font-display { font-style: normal; }
+
+/* --- Ornament rules → simple dividers --- */
 .rule-ornament {
   display: flex;
   align-items: center;
@@ -80,112 +71,108 @@ body {
   flex: 1;
   height: 1px;
   background: linear-gradient(90deg, transparent, currentColor, transparent);
-  opacity: 0.5;
+  opacity: 0.35;
 }
 
-/* --- Plate (the new card-glass) — feels like an inset bronze plate on parchment --- */
+/* --- Card --- */
 .plate {
   background:
-    linear-gradient(180deg, rgba(232,220,192,0.04), rgba(232,220,192,0.015)),
-    rgba(13, 10, 7, 0.55);
-  border: 1px solid rgba(198,155,61,0.22);
+    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)),
+    rgba(22, 34, 54, 0.6);
+  border: 1px solid rgba(255,255,255,0.08);
   box-shadow:
-    0 18px 60px -22px rgba(0,0,0,0.85),
-    0 1px 0 0 rgba(232,220,192,0.05) inset,
-    0 0 0 1px rgba(0,0,0,0.4) inset;
+    0 12px 40px -16px rgba(0,0,0,0.45),
+    0 1px 0 0 rgba(255,255,255,0.06) inset;
   backdrop-filter: blur(6px);
-  border-radius: 0.5rem;
+  border-radius: 1rem;
   position: relative;
   z-index: 2;
 }
 .plate-warm {
   background:
-    linear-gradient(180deg, rgba(232,220,192,0.06), rgba(232,220,192,0.02)),
-    rgba(21, 17, 10, 0.7);
+    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)),
+    rgba(31, 46, 71, 0.7);
 }
 
-/* Hairline gold edge for emphasis */
+/* Hairline accent edge */
 .gilt {
   box-shadow:
-    0 0 0 1px rgba(198,155,61,0.55),
-    0 18px 60px -22px rgba(0,0,0,0.85),
-    0 1px 0 0 rgba(232,220,192,0.06) inset;
+    0 0 0 1px rgba(255,200,87,0.45),
+    0 12px 40px -16px rgba(0,0,0,0.5),
+    0 1px 0 0 rgba(255,255,255,0.08) inset;
 }
 
-/* --- Tier palette (parchment-tinted, not rainbow) — tuned for WCAG AA on dark plate --- */
-.tier-1 { color: #9bc8b6; }   /* verdigris light */
-.tier-2 { color: #d6bd8a; }   /* gold mid */
-.tier-3 { color: #ecc063; }   /* gold bright */
-.tier-4 { color: #e88775; }   /* clay light */
-.tier-5 { color: #ef7a7a; }   /* oxblood light */
+/* --- Tier palette — kid friendly, WCAG AA on dark cards --- */
+.tier-1 { color: #6aebb6; }   /* mint */
+.tier-2 { color: #7fc8ff; }   /* sky */
+.tier-3 { color: #ffd97a; }   /* sunshine */
+.tier-4 { color: #ffae6e; }   /* tangerine */
+.tier-5 { color: #ff8a8a; }   /* coral */
 
-.tier-bg-1 { background: rgba(61,106,90,0.10); border-color: rgba(61,106,90,0.45); }
-.tier-bg-2 { background: rgba(184,152,101,0.10); border-color: rgba(184,152,101,0.45); }
-.tier-bg-3 { background: rgba(214,166,74,0.10); border-color: rgba(214,166,74,0.45); }
-.tier-bg-4 { background: rgba(194,90,74,0.10); border-color: rgba(194,90,74,0.45); }
-.tier-bg-5 { background: rgba(208,69,69,0.12); border-color: rgba(208,69,69,0.55); }
+.tier-bg-1 { background: rgba(62,213,152,0.12); border-color: rgba(62,213,152,0.45); }
+.tier-bg-2 { background: rgba(127,200,255,0.12); border-color: rgba(127,200,255,0.45); }
+.tier-bg-3 { background: rgba(255,217,122,0.12); border-color: rgba(255,217,122,0.55); }
+.tier-bg-4 { background: rgba(255,174,110,0.12); border-color: rgba(255,174,110,0.5); }
+.tier-bg-5 { background: rgba(255,138,138,0.14); border-color: rgba(255,138,138,0.55); }
 
 /* --- Buttons --- */
 .btn-leaf {
-  background: linear-gradient(180deg, #d6a64a, #a87a23);
+  background: linear-gradient(180deg, #ffd97a, #ffb13a);
   color: #1a1208;
-  border: 1px solid rgba(0,0,0,0.35);
+  border: 1px solid rgba(0,0,0,0.15);
   box-shadow:
-    0 1px 0 rgba(255,220,150,0.45) inset,
-    0 -1px 0 rgba(0,0,0,0.35) inset,
-    0 8px 24px -10px rgba(198,155,61,0.5);
+    0 1px 0 rgba(255,255,255,0.5) inset,
+    0 -1px 0 rgba(0,0,0,0.15) inset,
+    0 8px 20px -8px rgba(255,200,87,0.55);
   transition: transform 120ms ease, box-shadow 200ms ease, filter 200ms ease;
+  font-weight: 600;
 }
-.btn-leaf:hover { filter: brightness(1.08); transform: translateY(-1px); }
-.btn-leaf:active { transform: translateY(0); filter: brightness(0.95); }
+.btn-leaf:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.btn-leaf:active { transform: translateY(0); filter: brightness(0.96); }
 
 .btn-ghost {
-  background: transparent;
+  background: rgba(255,255,255,0.04);
   color: var(--paper);
-  border: 1px solid rgba(232,220,192,0.18);
+  border: 1px solid rgba(255,255,255,0.14);
   transition: background 200ms ease, border-color 200ms ease;
+  font-weight: 500;
 }
-.btn-ghost:hover { background: rgba(232,220,192,0.06); border-color: rgba(232,220,192,0.32); }
+.btn-ghost:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.25); }
 
-/* --- Board treatments --- */
-.sq-light { background-color: #c7b58c; }   /* aged ivory */
-.sq-dark  { background-color: #4a3826; }   /* walnut ink */
-.sq-sel   { box-shadow: inset 0 0 0 9999px rgba(214,166,74,0.42); }
-.sq-last  { box-shadow: inset 0 0 0 9999px rgba(122,31,31,0.28); }
+/* --- Board treatments — chess.com-ish green theme --- */
+.sq-light { background-color: #eeeed2; }
+.sq-dark  { background-color: #769656; }
+.sq-sel   { box-shadow: inset 0 0 0 9999px rgba(255,217,122,0.45); }
+.sq-last  { box-shadow: inset 0 0 0 9999px rgba(255,217,122,0.28); }
 .sq-sel.sq-last {
   box-shadow:
-    inset 0 0 0 9999px rgba(214,166,74,0.32),
-    inset 0 0 0 9999px rgba(122,31,31,0.18);
+    inset 0 0 0 9999px rgba(255,217,122,0.32),
+    inset 0 0 0 9999px rgba(255,217,122,0.18);
 }
-.sq-hover { box-shadow: inset 0 0 0 3px rgba(214,166,74,0.85); }
+.sq-hover { box-shadow: inset 0 0 0 3px rgba(255,217,122,0.85); }
 
-/* Move-target dot: ringed inside a square. */
+/* Move-target dot */
 .dot-target {
   width: 28%;
   height: 28%;
   border-radius: 9999px;
-  background: rgba(20, 14, 6, 0.45);
-  box-shadow: 0 0 0 2px rgba(214,166,74,0.55);
+  background: rgba(20, 30, 20, 0.35);
 }
 .dot-capture {
   position: absolute;
   inset: 6%;
   border-radius: 9999px;
-  border: 3px solid rgba(208,69,69,0.7);
-  box-shadow: 0 0 0 1px rgba(0,0,0,0.4) inset;
+  border: 4px solid rgba(255,107,107,0.7);
 }
 
 /* --- Drag/drop --- */
-.dragging {
-  cursor: grabbing !important;
-  opacity: 0.35;
-}
+.dragging { cursor: grabbing !important; opacity: 0.35; }
 .drag-ghost {
   position: fixed;
   pointer-events: none;
   z-index: 60;
   transform: translate(-50%, -50%);
-  filter: drop-shadow(0 14px 18px rgba(0,0,0,0.5));
+  filter: drop-shadow(0 14px 18px rgba(0,0,0,0.45));
 }
 
 /* --- Animations --- */
@@ -193,57 +180,54 @@ body {
   0% { opacity: 0; transform: translateY(20px) scale(0.96); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-.animate-reveal { animation: drawback-reveal 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.animate-reveal { animation: drawback-reveal 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
 
 .no-tap-highlight { -webkit-tap-highlight-color: transparent; }
 
-/* Headings should sit above the noise overlay */
 main, nav, header, footer { position: relative; z-index: 2; }
 
-/* Accessibility: visible focus ring on any interactive element */
+/* Accessibility */
 :focus-visible {
-  outline: 2px solid rgba(230, 191, 106, 0.85);
+  outline: 2px solid rgba(255,200,87,0.9);
   outline-offset: 2px;
-  border-radius: 2px;
+  border-radius: 4px;
 }
 
-/* Honor reduced motion */
 @media (prefers-reduced-motion: reduce) {
-  .animate-rise, .animate-seal, .animate-sigil, .animate-flicker, .animate-reveal {
+  .animate-rise, .animate-seal, .animate-sigil, .animate-flicker, .animate-reveal, .animate-bob {
     animation: none !important;
   }
   * { transition: none !important; }
 }
 
-/* Mobile: ensure 44x44 tap targets on key buttons */
 @media (max-width: 640px) {
   .btn-leaf, .btn-ghost { min-height: 44px; }
 }
 
-/* Selection */
-::selection { background: rgba(214,166,74,0.35); color: var(--paper); }
-
-/* Subtle scrollbar */
+::selection { background: rgba(255,200,87,0.4); color: #1a1208; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: rgba(198,155,61,0.18); border-radius: 6px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(198,155,61,0.32); }
+::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
 ::-webkit-scrollbar-track { background: transparent; }
 
-/* Tarot-card ornamental corner */
+/* Decorative corners — softened (now barely visible) */
 .card-corner {
   position: absolute;
-  width: 18px;
-  height: 18px;
-  border-color: rgba(198,155,61,0.55);
+  width: 14px;
+  height: 14px;
+  border-color: rgba(255,200,87,0.35);
   pointer-events: none;
 }
-.card-corner.tl { top: 8px; left: 8px; border-top: 1px solid; border-left: 1px solid; }
-.card-corner.tr { top: 8px; right: 8px; border-top: 1px solid; border-right: 1px solid; }
-.card-corner.bl { bottom: 8px; left: 8px; border-bottom: 1px solid; border-left: 1px solid; }
-.card-corner.br { bottom: 8px; right: 8px; border-bottom: 1px solid; border-right: 1px solid; }
+.card-corner.tl { top: 8px; left: 8px; border-top: 1px solid; border-left: 1px solid; border-top-left-radius: 6px; }
+.card-corner.tr { top: 8px; right: 8px; border-top: 1px solid; border-right: 1px solid; border-top-right-radius: 6px; }
+.card-corner.bl { bottom: 8px; left: 8px; border-bottom: 1px solid; border-left: 1px solid; border-bottom-left-radius: 6px; }
+.card-corner.br { bottom: 8px; right: 8px; border-bottom: 1px solid; border-right: 1px solid; border-bottom-right-radius: 6px; }
 
-/* Sigil ring (decorative) */
+/* The old "sigil" ring — kept but barely visible so existing landing markup doesn't break */
 .sigil {
-  background: conic-gradient(from 0deg, transparent 0 30%, rgba(198,155,61,0.25) 30% 33%, transparent 33% 60%, rgba(198,155,61,0.18) 60% 63%, transparent 63%);
+  background: conic-gradient(from 0deg, transparent 0 30%, rgba(255,200,87,0.18) 30% 33%, transparent 33% 60%, rgba(167,139,250,0.14) 60% 63%, transparent 63%);
   border-radius: 9999px;
 }
+
+/* Parchment-noise overlay disabled — too busy for the new look */
+.parchment-noise::before { content: none !important; }

@@ -20,7 +20,7 @@ interface Props {
 export function GameOver({ result, whiteDrawback, blackDrawback, myColor, onRematch }: Props) {
   const won = result.winner === myColor;
   const draw = result.winner === "draw";
-  const headline = draw ? "A Draw" : won ? "Victory" : "Defeat";
+  const headline = draw ? "Draw" : won ? "You win!" : "You lose";
   const tone = draw ? "text-bruise-glow" : won ? "text-gold-leaf" : "text-oxblood-glow";
 
   useEffect(() => {
@@ -43,7 +43,7 @@ export function GameOver({ result, whiteDrawback, blackDrawback, myColor, onRema
         <div className="absolute -bottom-32 -left-24 w-72 h-72 sigil opacity-30 animate-sigil pointer-events-none" style={{ animationDirection: "reverse" }} />
 
         <div className="relative text-center">
-          <div className="smallcaps text-[11px] text-parchment-400">The Verdict</div>
+          <div className="smallcaps text-[11px] text-parchment-400">Game over</div>
           <div className={`mt-1 font-display text-6xl sm:text-7xl italic ${tone} animate-seal`}>
             {headline}
           </div>
@@ -51,7 +51,7 @@ export function GameOver({ result, whiteDrawback, blackDrawback, myColor, onRema
         </div>
 
         <div className="mt-7 rule-ornament text-[11px]">
-          <span className="font-display italic">The drawbacks unsealed</span>
+          <span className="font-display">The secret rules</span>
         </div>
 
         <div className="mt-4 grid sm:grid-cols-2 gap-3">

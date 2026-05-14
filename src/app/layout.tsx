@@ -1,20 +1,18 @@
 import type { Metadata } from "next";
-import { Cormorant_Garamond, IM_Fell_English, JetBrains_Mono } from "next/font/google";
+import { Fredoka, Nunito, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
-const display = Cormorant_Garamond({
+const display = Fredoka({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
-  style: ["normal", "italic"],
   variable: "--font-display",
   display: "swap",
 });
 
-const body = IM_Fell_English({
+const body = Nunito({
   subsets: ["latin"],
-  weight: ["400"],
-  style: ["normal", "italic"],
+  weight: ["400", "500", "600", "700"],
   variable: "--font-body",
   display: "swap",
 });
@@ -27,15 +25,15 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Drawback Chess · An almanac of cursed games",
+  title: "Drawback Chess — chess with secret rules",
   description:
-    "Each player is dealt a secret rule that breaks the game. Find theirs before they find yours.",
+    "Every player gets a secret rule. Win the game and figure out theirs before they figure out yours.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
-      <body className="no-tap-highlight font-body parchment-noise">
+      <body className="no-tap-highlight font-body">
         {children}
         <Analytics />
       </body>

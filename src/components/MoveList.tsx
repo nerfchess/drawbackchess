@@ -13,11 +13,9 @@ export function MoveList({ moves }: { moves: Move[] }) {
   }
   return (
     <div className="plate p-4 max-h-72 overflow-y-auto">
-      <div className="rule-ornament text-[10px] mb-3">
-        <span className="font-display italic">The Annotation</span>
-      </div>
+      <div className="smallcaps text-[10px] text-parchment-400 mb-3">Move history</div>
       {rows.length === 0 && (
-        <div className="text-parchment-300/60 italic text-sm">No moves recorded.</div>
+        <div className="text-parchment-300/60 text-sm">No moves yet.</div>
       )}
       <div className="font-mono text-[13px] space-y-0.5">
         {rows.map((row, i) => (

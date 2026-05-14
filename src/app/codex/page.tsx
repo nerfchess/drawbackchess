@@ -34,17 +34,17 @@ export default function CodexPage() {
       </nav>
 
       <section className="max-w-6xl mx-auto px-6 pt-4">
-        <div className="smallcaps text-[11px] text-parchment-400">vol. I</div>
-        <h1 className="font-display text-5xl sm:text-6xl mt-1">The Codex.</h1>
-        <p className="mt-3 text-parchment-300/85 italic font-display">
-          {ALL_DRAWBACKS.length} drawbacks cataloged. {implementedCount} are presently playable.
+        <div className="smallcaps text-[11px] text-parchment-400">the rules</div>
+        <h1 className="font-display text-5xl sm:text-6xl mt-1">All the rules</h1>
+        <p className="mt-3 text-parchment-200">
+          {ALL_DRAWBACKS.length} secret rules in the library. {implementedCount} are playable today.
         </p>
         <div className="mt-4">
           <Link
             href="/codex/build"
             className="inline-flex items-center gap-2 px-4 py-2 rounded-sm btn-ghost font-display italic text-sm"
           >
-            <span aria-hidden="true">✦</span> Forge your own drawback
+            <span aria-hidden="true">✦</span> Build your own rule
           </Link>
         </div>
 

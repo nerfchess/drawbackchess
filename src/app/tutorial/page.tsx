@@ -43,11 +43,11 @@ export default function TutorialPage() {
         <Link href="/play" className="text-sm font-display italic text-parchment hover:text-gold-leaf">Play</Link>
       </nav>
       <section className="max-w-3xl mx-auto px-6 pt-4">
-        <div className="smallcaps text-[11px] text-parchment-400">a brief manual</div>
-        <h1 className="font-display text-5xl sm:text-6xl mt-1">House rules.</h1>
-        <p className="dropcap mt-5 text-[16px] leading-[1.7] text-parchment-200">
-          Drawback Chess is chess; until it isn&apos;t. The six rules below are everything a player
-          needs to know to sit down with a fresh hand. Everything else is in the curse you were dealt.
+        <div className="smallcaps text-[11px] text-parchment-400">how to play</div>
+        <h1 className="font-display text-5xl sm:text-6xl mt-1">House rules</h1>
+        <p className="mt-5 text-[16px] leading-[1.7] text-parchment-200">
+          Drawback Chess is chess — until it isn't. The six rules below are everything you need to know.
+          Everything else is in your secret rule.
         </p>
         <div className="mt-9 space-y-3">
           {RULES.map((r) => (
@@ -69,19 +69,19 @@ export default function TutorialPage() {
             href="/tutorial/walkthrough"
             className="px-6 py-2.5 rounded-sm btn-leaf font-display font-semibold"
           >
-            Try the interactive walkthrough
+            Try the interactive lessons
           </Link>
           <Link
             href="/play"
             className="px-6 py-2.5 rounded-sm btn-ghost font-display italic"
           >
-            Skip to the cabinet
+            Skip and play
           </Link>
           <Link
             href="/codex"
             className="px-6 py-2.5 rounded-sm btn-ghost font-display italic"
           >
-            Browse the codex
+            Browse all rules
           </Link>
         </div>
       </section>

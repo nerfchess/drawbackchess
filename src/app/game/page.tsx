@@ -33,7 +33,7 @@ function pickRandomDrawback(): Drawback {
 
 export default function GamePageWrapper() {
   return (
-    <Suspense fallback={<main className="min-h-screen flex items-center justify-center text-parchment-300/70 italic">Drawing the cards…</main>}>
+    <Suspense fallback={<main className="min-h-screen flex items-center justify-center text-parchment-300/70 italic">Loading game…</main>}>
       <GamePage />
     </Suspense>
   );
@@ -119,7 +119,7 @@ function GamePage() {
     if (game.board.turn === myColor) return;
     if (aiThinking.current) return;
     aiThinking.current = true;
-    const delay = difficulty === "easy" ? 300 : difficulty === "medium" ? 500 : 700;
+    const delay = difficulty === "easy" ? 120 : difficulty === "medium" ? 200 : 320;
     const tid = setTimeout(() => {
       const m = pickAIMove(game, difficulty);
       if (m) {
@@ -141,7 +141,7 @@ function GamePage() {
   if (!game) {
     return (
       <main className="min-h-screen flex items-center justify-center text-parchment-300/70 italic font-display text-2xl">
-        Drawing the cards…
+        Loading game…
       </main>
     );
   }
@@ -187,7 +187,7 @@ function GamePage() {
         </Link>
         <div className="flex items-center gap-4">
           <div className="smallcaps text-[11px] text-parchment-400 hidden sm:block">
-            playing {myColor === "w" ? "White" : "Black"} · the cabinet on {difficulty}
+            playing {myColor === "w" ? "White" : "Black"} · bot on {difficulty}
           </div>
           <button
             onClick={toggleMute}
@@ -204,7 +204,7 @@ function GamePage() {
           <div className="flex items-center justify-between text-sm">
             <span className="font-display italic text-parchment-300/90">
               <span className="smallcaps text-[11px] text-parchment-400 mr-2">Turn</span>
-              <span className={game.board.turn === myColor ? "text-gold-leaf" : "text-oxblood-glow"}>
+              <span className={game.board.turn === myColor ? "text-gold-leaf font-semibold" : "text-bruise-glow font-semibold"}>
                 {whoseTurn}
               </span>
             </span>

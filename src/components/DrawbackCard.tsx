@@ -22,11 +22,11 @@ export function DrawbackCard({ drawback, revealed = true, compact = false, owner
           <div className="w-12 h-12 rounded-full border border-gold/40 flex items-center justify-center font-display text-2xl text-gold/70 italic">?</div>
           <div>
             <div className="smallcaps text-[11px] text-parchment-400">{ownerLabel ?? "Opponent"}</div>
-            <div className="font-display text-xl text-parchment/80 italic">A sealed drawback</div>
+            <div className="font-display text-xl text-parchment/80">Hidden rule</div>
           </div>
         </div>
-        <p className="mt-3 text-sm text-parchment-300/70 italic leading-relaxed">
-          Their secret rule shall be unsealed when the game ends.
+        <p className="mt-3 text-sm text-parchment-300/80 leading-relaxed">
+          You'll see their rule when the game ends.
         </p>
       </div>
     );

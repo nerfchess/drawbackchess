@@ -25,25 +25,19 @@ export default function PlayPage() {
     <main className="min-h-screen">
       <nav className="px-6 py-6 max-w-6xl mx-auto flex items-center justify-between">
         <Link href="/" className="font-display text-2xl tracking-tight">
-          drawback<span className="italic text-gold-leaf">chess</span>
+          drawback<span className="text-gold-leaf">chess</span>
         </Link>
-        <Link href="/codex" className="text-sm font-display italic text-parchment hover:text-gold-leaf">The Codex</Link>
+        <Link href="/codex" className="text-sm font-display text-parchment hover:text-gold-leaf">Rules</Link>
       </nav>
 
-      <section className="max-w-2xl mx-auto px-6 py-10">
-        <div className="smallcaps text-[11px] text-parchment-400">a fresh hand</div>
-        <h1 className="font-display text-5xl mt-1">New game.</h1>
-        <p className="mt-3 text-parchment-300/85 italic font-display">
-          Sit at the cabinet. The dealer will assign your curse, and the AI&apos;s.
+      <section className="max-w-2xl mx-auto px-6 py-8">
+        <h1 className="font-display text-5xl">New game</h1>
+        <p className="mt-3 text-parchment-200">
+          Pick how you want to play. You'll get a random secret rule (or pick one to practice).
         </p>
 
-        <div className="mt-10 plate p-6 sm:p-7 space-y-7 relative">
-          <span className="card-corner tl" />
-          <span className="card-corner tr" />
-          <span className="card-corner bl" />
-          <span className="card-corner br" />
-
-          <Group label="Cabinet difficulty">
+        <div className="mt-8 plate p-6 sm:p-7 space-y-6">
+          <Group label="Bot strength">
             {(["easy", "medium", "hard"] as const).map((d) => (
               <Pill key={d} selected={difficulty === d} onClick={() => setDifficulty(d)}>
                 {d[0].toUpperCase() + d.slice(1)}
@@ -51,13 +45,13 @@ export default function PlayPage() {
             ))}
           </Group>
 
-          <Group label="Your colour">
+          <Group label="Your color">
             <Pill selected={color === "w"} onClick={() => setColor("w")}>White</Pill>
             <Pill selected={color === "random"} onClick={() => setColor("random")}>Random</Pill>
             <Pill selected={color === "b"} onClick={() => setColor("b")}>Black</Pill>
           </Group>
 
-          <Group label="Your drawback">
+          <Group label="Your secret rule">
             <Pill selected={drawbackId === "random"} onClick={() => setDrawbackId("random")}>
               Surprise me
             </Pill>
@@ -68,7 +62,7 @@ export default function PlayPage() {
 
           <div>
             <div className="smallcaps text-[11px] text-parchment-400 mb-2">
-              or pick a specific drawback to study
+              Or pick a specific rule to practice
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto pr-1">
               {PLAYABLE_DRAWBACKS.map((d) => (
@@ -76,14 +70,14 @@ export default function PlayPage() {
                   key={d.id}
                   onClick={() => setDrawbackId(d.id)}
                   className={
-                    "text-left p-3 rounded-sm border transition " +
+                    "text-left p-3 rounded-xl border transition " +
                     (drawbackId === d.id
                       ? `tier-bg-${d.tier} border-2`
-                      : "border-parchment/15 hover:border-parchment/30 bg-ink-900/40")
+                      : "border-white/10 hover:border-white/25 bg-ink-900/40")
                   }
                 >
                   <div className={`font-display text-base tier-${d.tier}`}>{d.name}</div>
-                  <div className="text-[11px] text-parchment-300/70 mt-0.5 line-clamp-2 leading-snug">{d.description}</div>
+                  <div className="text-[11px] text-parchment-300/80 mt-0.5 line-clamp-2 leading-snug">{d.description}</div>
                 </button>
               ))}
             </div>
@@ -91,9 +85,9 @@ export default function PlayPage() {
 
           <button
             onClick={start}
-            className="w-full py-3.5 rounded-sm btn-leaf font-display text-lg font-semibold"
+            className="w-full py-3.5 rounded-full btn-leaf font-display text-lg"
           >
-            Deal me in
+            Start game →
           </button>
         </div>
       </section>
@@ -119,10 +113,10 @@ function Pill({
     <button
       onClick={onClick}
       className={
-        "px-4 py-2 rounded-sm border font-display italic transition " +
+        "px-4 py-2 rounded-full border font-display transition " +
         (selected
           ? "bg-gold/15 border-gold text-gold-leaf"
-          : "border-parchment/15 text-parchment-200 hover:border-parchment/30")
+          : "border-white/15 text-parchment-200 hover:border-white/30")
       }
     >
       {children}

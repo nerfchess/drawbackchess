@@ -243,15 +243,11 @@ export function Board({
                 {fogHide ? (
                   <div className="absolute inset-0 bg-gradient-to-br from-stone-700/85 to-stone-900/95 backdrop-blur-sm pointer-events-none" />
                 ) : piece ? (
-                  <motion.div
-                    layout={false}
-                    initial={{ scale: 0.85, opacity: 0 }}
-                    animate={{ scale: 1, opacity: 1 }}
-                    transition={{ duration: 0.15 }}
+                  <div
                     className={"w-[88%] h-[88%] pointer-events-none " + (isDragging ? "opacity-30" : "")}
                   >
                     <Piece type={piece.type} color={piece.color} size="100%" />
-                  </motion.div>
+                  </div>
                 ) : null}
 
                 {isTarget && (
