@@ -112,12 +112,12 @@ body {
     0 1px 0 0 rgba(232,220,192,0.06) inset;
 }
 
-/* --- Tier palette (parchment-tinted, not rainbow) --- */
-.tier-1 { color: #6f9a87; }   /* verdigris */
-.tier-2 { color: #b89865; }   /* gold dim */
-.tier-3 { color: #d6a64a; }   /* gold */
-.tier-4 { color: #c25a4a; }   /* clay */
-.tier-5 { color: #d04545; }   /* oxblood glow */
+/* --- Tier palette (parchment-tinted, not rainbow) — tuned for WCAG AA on dark plate --- */
+.tier-1 { color: #9bc8b6; }   /* verdigris light */
+.tier-2 { color: #d6bd8a; }   /* gold mid */
+.tier-3 { color: #ecc063; }   /* gold bright */
+.tier-4 { color: #e88775; }   /* clay light */
+.tier-5 { color: #ef7a7a; }   /* oxblood light */
 
 .tier-bg-1 { background: rgba(61,106,90,0.10); border-color: rgba(61,106,90,0.45); }
 .tier-bg-2 { background: rgba(184,152,101,0.10); border-color: rgba(184,152,101,0.45); }
@@ -199,6 +199,26 @@ body {
 
 /* Headings should sit above the noise overlay */
 main, nav, header, footer { position: relative; z-index: 2; }
+
+/* Accessibility: visible focus ring on any interactive element */
+:focus-visible {
+  outline: 2px solid rgba(230, 191, 106, 0.85);
+  outline-offset: 2px;
+  border-radius: 2px;
+}
+
+/* Honor reduced motion */
+@media (prefers-reduced-motion: reduce) {
+  .animate-rise, .animate-seal, .animate-sigil, .animate-flicker, .animate-reveal {
+    animation: none !important;
+  }
+  * { transition: none !important; }
+}
+
+/* Mobile: ensure 44x44 tap targets on key buttons */
+@media (max-width: 640px) {
+  .btn-leaf, .btn-ghost { min-height: 44px; }
+}
 
 /* Selection */
 ::selection { background: rgba(214,166,74,0.35); color: var(--paper); }

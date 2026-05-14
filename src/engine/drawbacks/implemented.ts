@@ -172,6 +172,15 @@ export const PACMAN: Drawback = db({
     const pawnCaptures = moves.filter((m) => m.captured === "p");
     return pawnCaptures.length ? pawnCaptures : moves;
   },
+  hint: (_s, _c, legal) => {
+    const caps = legal.filter((m) => m.captured === "p");
+    if (!caps.length) return null;
+    return {
+      text: "You must capture a pawn this turn.",
+      squares: Array.from(new Set(caps.map((m) => m.from))),
+      tone: "warn",
+    };
+  },
 });
 
 export const GREEDY: Drawback = db({
@@ -190,6 +199,18 @@ export const GREEDY: Drawback = db({
       if (!m.captured || m.captured === "k") return true;
       return PIECE_VAL[m.captured] >= max;
     });
+  },
+  hint: (_s, _c, legal) => {
+    let max = 0;
+    for (const m of legal) if (m.captured && m.captured !== "k") max = Math.max(max, PIECE_VAL[m.captured]);
+    if (max === 0) return null;
+    const names: Record<number, string> = { 1: "pawn", 3: "minor piece", 5: "rook", 9: "queen" };
+    const must = legal.filter((m) => m.captured && PIECE_VAL[m.captured] >= max);
+    return {
+      text: `You must capture the ${names[max] ?? `${max}-point piece`}.`,
+      squares: Array.from(new Set(must.map((m) => m.from))),
+      tone: "warn",
+    };
   },
 });
 
@@ -343,7 +364,14 @@ export const COWARDLY: Drawback = db({
     const backward = moves.filter((m) => (RANK(m.to) - RANK(m.from)) * (dir > 0 ? 1 : -1) > 0);
     return backward;
   },
-  // If no backward move exists, legalMoves will be empty → loss.
+  hint: (_s, ctx, legal) => {
+    if (!ctx.opponentLastMove?.captured) return null;
+    return {
+      text: "They captured. You must retreat this turn or lose.",
+      squares: Array.from(new Set(legal.map((m) => m.from))),
+      tone: "warn",
+    };
+  },
 });
 
 export const HAND_AND_BRAINLESS: Drawback = db({
@@ -363,6 +391,21 @@ export const HAND_AND_BRAINLESS: Drawback = db({
     const s = state as { piece: PieceType };
     const filtered = moves.filter((m) => m.piece === s.piece);
     return filtered.length ? filtered : moves;
+  },
+  hint: (state, _c, legal) => {
+    const s = state as { piece: PieceType };
+    const names: Record<PieceType, string> = {
+      p: "pawn", n: "knight", b: "bishop", r: "rook", q: "queen", k: "king",
+    };
+    const matching = legal.filter((m) => m.piece === s.piece);
+    if (matching.length === 0) {
+      return { text: `The voice says ${names[s.piece]} — but none can move. Pick anything.`, tone: "info" };
+    }
+    return {
+      text: `The voice says: move a ${names[s.piece]}.`,
+      squares: Array.from(new Set(matching.map((m) => m.from))),
+      tone: "warn",
+    };
   },
 });
 
@@ -398,6 +441,13 @@ export const SLEEPY_KING: Drawback = db({
     const { isInCheck } = require("../board");
     if (isInCheck(ctx.board, ctx.me)) return moves;
     return moves.filter((m) => m.piece !== "k");
+  },
+  hint: (_s, ctx) => {
+    const { isInCheck } = require("../board");
+    if (isInCheck(ctx.board, ctx.me)) {
+      return { text: "The king stirs — he can move while in check.", tone: "info" };
+    }
+    return null;
   },
 });
 

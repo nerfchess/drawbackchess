@@ -202,6 +202,7 @@ export function Board({
             const kep = inKingPass(sq);
             const isHover = hoverSq === sq && drag != null;
             const isDragging = drag?.from === sq;
+            const isForced = visual?.highlightSquares?.includes(sq);
 
             const fogHide =
               !!visual?.fogged && piece && piece.color !== myColor && !lastTo;
@@ -235,6 +236,9 @@ export function Board({
                 )}
                 {isDuck && (
                   <div className="absolute inset-0 flex items-center justify-center text-3xl pointer-events-none">🦆</div>
+                )}
+                {isForced && !isDragging && (
+                  <div className="absolute inset-0 pointer-events-none rounded-sm ring-2 ring-inset ring-gold-leaf/80 shadow-[inset_0_0_24px_-4px_rgba(230,191,106,0.55)] animate-flicker" />
                 )}
                 {fogHide ? (
                   <div className="absolute inset-0 bg-gradient-to-br from-stone-700/85 to-stone-900/95 backdrop-blur-sm pointer-events-none" />

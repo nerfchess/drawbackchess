@@ -49,7 +49,7 @@ export default function HomePage() {
           </ul>
         </div>
 
-        <div className="relative h-[440px] sm:h-[520px]">
+        <div className="relative h-[440px] sm:h-[520px] overflow-hidden lg:overflow-visible">
           <div className="absolute -inset-12 sigil opacity-20 animate-sigil pointer-events-none" />
           <FloatCard className="absolute top-0 left-2 sm:left-8 -rotate-6">
             <DrawbackCard drawback={FOG_OF_WAR} />

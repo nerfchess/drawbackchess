@@ -32,6 +32,14 @@ export interface Drawback {
     ctx: GameContext
   ) => null | { reason: string };
 
+  // Optional hint surfaced in the UI when the drawback narrows or forces moves
+  // this turn. Returned squares (if any) will be highlighted on the board.
+  hint?: (
+    state: DrawbackState,
+    ctx: GameContext,
+    legalMoves: Move[]
+  ) => null | { text: string; squares?: number[]; tone?: "info" | "warn" };
+
   // Hooks for visualization
   visual?: (state: DrawbackState, ctx: GameContext) => {
     fogged?: boolean;

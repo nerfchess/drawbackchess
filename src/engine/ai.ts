@@ -2,6 +2,29 @@ import { findKing, generateMoves, makeMove } from "./board";
 import { DrawbackGame, legalMoves, makeContext } from "./game";
 import { BoardState, Color, FILE, Move, RANK } from "./types";
 
+// A move is self-losing if making it (a) lets the opponent capture our king for free
+// next ply, or (b) trips our own drawback's checkLoss on the resulting board.
+function isSelfLosing(game: DrawbackGame, move: Move): boolean {
+  const me = game.board.turn;
+  const slot = me === "w" ? game.white : game.black;
+  const nb = makeMove(game.board, move);
+  if (slot.drawback.checkLoss) {
+    const ctx = {
+      board: nb,
+      me,
+      opponentLastMove: game.board.history[game.board.history.length - 1] ?? null,
+      myLastMove: move,
+      moveNumber: nb.history.filter((m) => m.color === me).length,
+      capturedByMe: game.captured[me],
+      capturedFromMe: game.captured[me === "w" ? "b" : "w"],
+    };
+    if (slot.drawback.checkLoss(slot.state, ctx)) return true;
+  }
+  // king-en-passant exposure check is already encoded in normal move evaluation;
+  // for simplicity we don't deepen here.
+  return false;
+}
+
 const VAL: Record<string, number> = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
 
 function evaluate(board: BoardState, me: Color): number {
@@ -26,8 +49,11 @@ function centerBonus(sq: number, t: string): number {
 export type AILevel = "easy" | "medium" | "hard";
 
 export function pickAIMove(game: DrawbackGame, level: AILevel): Move | null {
-  const moves = legalMoves(game);
-  if (!moves.length) return null;
+  const all = legalMoves(game);
+  if (!all.length) return null;
+  // Prefer non-self-losing moves, but fall back to anything legal if all moves lose.
+  const safe = all.filter((m) => !isSelfLosing(game, m));
+  const moves = safe.length ? safe : all;
   if (level === "easy") {
     // captures preferred, else random
     const caps = moves.filter((m) => m.captured);

@@ -139,6 +139,14 @@ export function playMove(game: DrawbackGame, move: Move): DrawbackGame {
   return game;
 }
 
+export function currentHint(game: DrawbackGame, color: Color) {
+  const slot = color === "w" ? game.white : game.black;
+  if (!slot.drawback.hint) return null;
+  if (game.result || game.board.turn !== color) return null;
+  const ctx = makeContext(game, color);
+  return slot.drawback.hint(slot.state, ctx, legalMoves(game));
+}
+
 export function resign(game: DrawbackGame, color: Color): DrawbackGame {
   if (game.result) return game;
   game.result = { winner: color === "w" ? "b" : "w", reason: "resignation" };

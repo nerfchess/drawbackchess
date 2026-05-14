@@ -39,6 +39,14 @@ export default function CodexPage() {
         <p className="mt-3 text-parchment-300/85 italic font-display">
           {ALL_DRAWBACKS.length} drawbacks cataloged. {implementedCount} are presently playable.
         </p>
+        <div className="mt-4">
+          <Link
+            href="/codex/build"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-sm btn-ghost font-display italic text-sm"
+          >
+            <span aria-hidden="true">✦</span> Forge your own drawback
+          </Link>
+        </div>
 
         <div className="mt-7 plate p-4 sm:p-5 flex flex-wrap items-center gap-2 relative">
           <span className="card-corner tl" />

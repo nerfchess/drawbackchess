@@ -64,12 +64,18 @@ export default function TutorialPage() {
             </div>
           ))}
         </div>
-        <div className="mt-9 flex gap-3">
+        <div className="mt-9 flex flex-wrap gap-3">
           <Link
-            href="/play"
+            href="/tutorial/walkthrough"
             className="px-6 py-2.5 rounded-sm btn-leaf font-display font-semibold"
           >
-            Sit at the cabinet
+            Try the interactive walkthrough
+          </Link>
+          <Link
+            href="/play"
+            className="px-6 py-2.5 rounded-sm btn-ghost font-display italic"
+          >
+            Skip to the cabinet
           </Link>
           <Link
             href="/codex"

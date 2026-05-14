@@ -9,6 +9,7 @@ import { Drawback } from "@/engine/drawback";
 import { IMPLEMENTED_BY_ID, PLAYABLE_DRAWBACKS } from "@/engine/drawbacks/library";
 import {
   applyTurnStart,
+  currentHint,
   DrawbackGame,
   legalMoves,
   makeContext,
@@ -19,6 +20,7 @@ import {
 import { makeSeed } from "@/engine/rng";
 import { Color, Move } from "@/engine/types";
 import { isInCheck } from "@/engine/board";
+import { buildCustomDrawback, CustomDrawback } from "@/engine/drawbacks/custom";
 import { isMuted, playCapture, playCheck, playDrawback, playMove as playMoveSfx, setMuted } from "@/lib/sounds";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -60,10 +62,20 @@ function GamePage() {
   }, []);
 
   useEffect(() => {
-    const myDb =
-      myDrawbackId === "random"
-        ? pickRandomDrawback()
-        : IMPLEMENTED_BY_ID[myDrawbackId] ?? pickRandomDrawback();
+    let myDb: Drawback;
+    if (myDrawbackId === "__custom__") {
+      try {
+        const raw = sessionStorage.getItem("dc:active-custom");
+        const spec = raw ? (JSON.parse(raw) as CustomDrawback) : null;
+        myDb = spec ? buildCustomDrawback(spec) : pickRandomDrawback();
+      } catch {
+        myDb = pickRandomDrawback();
+      }
+    } else if (myDrawbackId === "random") {
+      myDb = pickRandomDrawback();
+    } else {
+      myDb = IMPLEMENTED_BY_ID[myDrawbackId] ?? pickRandomDrawback();
+    }
     const aiDb = pickRandomDrawback();
     const wDb = myColor === "w" ? myDb : aiDb;
     const bDb = myColor === "w" ? aiDb : myDb;
@@ -140,6 +152,8 @@ function GamePage() {
   const visual = myDrawback.visual?.(myState, myCtx);
   const opponentDrawback = myColor === "w" ? game.black.drawback : game.white.drawback;
   const lastMove = game.board.history[game.board.history.length - 1] ?? null;
+  const hint = currentHint(game, myColor);
+  const forcedSquares = hint?.squares ?? [];
 
   const handleMove = (m: Move) => {
     if (game.result) return;
@@ -201,13 +215,30 @@ function GamePage() {
               Resign
             </button>
           </div>
+          {hint && (
+            <div
+              role="status"
+              aria-live="polite"
+              className={
+                "plate p-3 px-4 flex items-center gap-3 " +
+                (hint.tone === "warn"
+                  ? "border-oxblood-glow/60 bg-oxblood/15"
+                  : "border-gold/40 bg-gold/10")
+              }
+            >
+              <span aria-hidden="true" className="text-gold-leaf font-display italic text-xl">!</span>
+              <span className="font-display italic text-[15px] text-parchment">
+                {hint.text}
+              </span>
+            </div>
+          )}
           <Board
             board={game.board}
             legalMoves={game.board.turn === myColor ? moves : []}
             orientation={myColor}
             onMove={handleMove}
             myColor={myColor}
-            visual={visual}
+            visual={{ ...(visual ?? {}), highlightSquares: forcedSquares }}
             lastMove={lastMove}
             disabled={!!game.result || game.board.turn !== myColor}
           />
