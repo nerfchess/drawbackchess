@@ -12,17 +12,22 @@ export function MoveList({ moves }: { moves: Move[] }) {
     });
   }
   return (
-    <div className="card-glass rounded-xl p-3 max-h-72 overflow-y-auto text-sm font-mono">
+    <div className="plate p-4 max-h-72 overflow-y-auto">
+      <div className="rule-ornament text-[10px] mb-3">
+        <span className="font-display italic">The Annotation</span>
+      </div>
       {rows.length === 0 && (
-        <div className="text-white/30">No moves yet.</div>
+        <div className="text-parchment-300/60 italic text-sm">No moves recorded.</div>
       )}
-      {rows.map((row, i) => (
-        <div key={i} className="grid grid-cols-[2rem_1fr_1fr] gap-2 py-0.5">
-          <span className="text-white/30">{i + 1}.</span>
-          <span>{row.w}</span>
-          <span className="text-white/70">{row.b}</span>
-        </div>
-      ))}
+      <div className="font-mono text-[13px] space-y-0.5">
+        {rows.map((row, i) => (
+          <div key={i} className="grid grid-cols-[2.2rem_1fr_1fr] gap-2">
+            <span className="text-parchment-400/70">{i + 1}.</span>
+            <span className="text-parchment">{row.w}</span>
+            <span className="text-parchment-300/80">{row.b}</span>
+          </div>
+        ))}
+      </div>
     </div>
   );
 }

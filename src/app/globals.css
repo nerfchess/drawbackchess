@@ -3,44 +3,192 @@
 @tailwind utilities;
 
 :root {
-  --font-display: "Space Grotesk", system-ui, sans-serif;
-  --font-sans: "Inter", system-ui, sans-serif;
+  --paper: #e8dcc0;
+  --paper-dim: #b8a986;
+  --ink-deep: #08060a;
+  --ink-warm: #15110a;
+  --gold: #c69b3d;
+  --gold-leaf: #e6bf6a;
+  --oxblood: #7a1f1f;
+  --verdigris: #3d6a5a;
+  --bruise: #5d4a73;
 }
 
 html, body {
-  background: radial-gradient(ellipse at top, #15151f 0%, #07070b 60%);
-  color: #e7e7ee;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(198,155,61,0.08), transparent 70%),
+    radial-gradient(ellipse 60% 80% at 100% 100%, rgba(122,31,31,0.10), transparent 70%),
+    radial-gradient(ellipse 60% 80% at 0% 100%, rgba(61,106,90,0.08), transparent 70%),
+    linear-gradient(180deg, #0d0a07 0%, #08060a 100%);
+  color: var(--paper);
   min-height: 100vh;
+  font-feature-settings: "liga", "dlig", "onum";
 }
 
 body {
-  font-family: var(--font-sans);
+  font-family: var(--font-body), Georgia, serif;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
-.glow-text {
-  text-shadow: 0 0 24px rgba(244, 185, 66, 0.3);
+/* Aged-paper grain laid over everything via a body pseudo. SVG noise data URI. */
+.parchment-noise::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.10;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.91   0 0 0 0 0.86   0 0 0 0 0.75   0 0 0 0.55 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
 
-.card-glass {
-  background: linear-gradient(180deg, rgba(31,31,44,0.7), rgba(15,15,24,0.7));
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255,255,255,0.06);
+/* --- Type rhythm --- */
+.font-display { font-family: var(--font-display), Georgia, serif; }
+.font-body    { font-family: var(--font-body), Georgia, serif; }
+.font-mono    { font-family: var(--font-mono), ui-monospace, monospace; }
+
+.smallcaps {
+  font-variant: small-caps;
+  letter-spacing: 0.18em;
+  text-transform: lowercase;
+}
+.allcaps {
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+}
+.dropcap::first-letter {
+  font-family: var(--font-display), Georgia, serif;
+  font-weight: 600;
+  float: left;
+  font-size: 3.4em;
+  line-height: 0.9;
+  padding: 0.08em 0.12em 0 0;
+  color: var(--gold-leaf);
 }
 
-.tier-1 { color: #7ed8a1; }
-.tier-2 { color: #6ec5ff; }
-.tier-3 { color: #f4b942; }
-.tier-4 { color: #ff8a5b; }
-.tier-5 { color: #ff5a7a; }
+/* --- Ornament rules --- */
+.rule-ornament {
+  display: flex;
+  align-items: center;
+  gap: 0.9rem;
+  color: var(--paper-dim);
+}
+.rule-ornament::before,
+.rule-ornament::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: linear-gradient(90deg, transparent, currentColor, transparent);
+  opacity: 0.5;
+}
 
-.tier-bg-1 { background: rgba(126,216,161,0.12); border-color: rgba(126,216,161,0.4); }
-.tier-bg-2 { background: rgba(110,197,255,0.12); border-color: rgba(110,197,255,0.4); }
-.tier-bg-3 { background: rgba(244,185,66,0.12); border-color: rgba(244,185,66,0.4); }
-.tier-bg-4 { background: rgba(255,138,91,0.12); border-color: rgba(255,138,91,0.4); }
-.tier-bg-5 { background: rgba(255,90,122,0.12); border-color: rgba(255,90,122,0.4); }
+/* --- Plate (the new card-glass) — feels like an inset bronze plate on parchment --- */
+.plate {
+  background:
+    linear-gradient(180deg, rgba(232,220,192,0.04), rgba(232,220,192,0.015)),
+    rgba(13, 10, 7, 0.55);
+  border: 1px solid rgba(198,155,61,0.22);
+  box-shadow:
+    0 18px 60px -22px rgba(0,0,0,0.85),
+    0 1px 0 0 rgba(232,220,192,0.05) inset,
+    0 0 0 1px rgba(0,0,0,0.4) inset;
+  backdrop-filter: blur(6px);
+  border-radius: 0.5rem;
+  position: relative;
+  z-index: 2;
+}
+.plate-warm {
+  background:
+    linear-gradient(180deg, rgba(232,220,192,0.06), rgba(232,220,192,0.02)),
+    rgba(21, 17, 10, 0.7);
+}
 
+/* Hairline gold edge for emphasis */
+.gilt {
+  box-shadow:
+    0 0 0 1px rgba(198,155,61,0.55),
+    0 18px 60px -22px rgba(0,0,0,0.85),
+    0 1px 0 0 rgba(232,220,192,0.06) inset;
+}
+
+/* --- Tier palette (parchment-tinted, not rainbow) --- */
+.tier-1 { color: #6f9a87; }   /* verdigris */
+.tier-2 { color: #b89865; }   /* gold dim */
+.tier-3 { color: #d6a64a; }   /* gold */
+.tier-4 { color: #c25a4a; }   /* clay */
+.tier-5 { color: #d04545; }   /* oxblood glow */
+
+.tier-bg-1 { background: rgba(61,106,90,0.10); border-color: rgba(61,106,90,0.45); }
+.tier-bg-2 { background: rgba(184,152,101,0.10); border-color: rgba(184,152,101,0.45); }
+.tier-bg-3 { background: rgba(214,166,74,0.10); border-color: rgba(214,166,74,0.45); }
+.tier-bg-4 { background: rgba(194,90,74,0.10); border-color: rgba(194,90,74,0.45); }
+.tier-bg-5 { background: rgba(208,69,69,0.12); border-color: rgba(208,69,69,0.55); }
+
+/* --- Buttons --- */
+.btn-leaf {
+  background: linear-gradient(180deg, #d6a64a, #a87a23);
+  color: #1a1208;
+  border: 1px solid rgba(0,0,0,0.35);
+  box-shadow:
+    0 1px 0 rgba(255,220,150,0.45) inset,
+    0 -1px 0 rgba(0,0,0,0.35) inset,
+    0 8px 24px -10px rgba(198,155,61,0.5);
+  transition: transform 120ms ease, box-shadow 200ms ease, filter 200ms ease;
+}
+.btn-leaf:hover { filter: brightness(1.08); transform: translateY(-1px); }
+.btn-leaf:active { transform: translateY(0); filter: brightness(0.95); }
+
+.btn-ghost {
+  background: transparent;
+  color: var(--paper);
+  border: 1px solid rgba(232,220,192,0.18);
+  transition: background 200ms ease, border-color 200ms ease;
+}
+.btn-ghost:hover { background: rgba(232,220,192,0.06); border-color: rgba(232,220,192,0.32); }
+
+/* --- Board treatments --- */
+.sq-light { background-color: #c7b58c; }   /* aged ivory */
+.sq-dark  { background-color: #4a3826; }   /* walnut ink */
+.sq-sel   { box-shadow: inset 0 0 0 9999px rgba(214,166,74,0.42); }
+.sq-last  { box-shadow: inset 0 0 0 9999px rgba(122,31,31,0.28); }
+.sq-sel.sq-last {
+  box-shadow:
+    inset 0 0 0 9999px rgba(214,166,74,0.32),
+    inset 0 0 0 9999px rgba(122,31,31,0.18);
+}
+.sq-hover { box-shadow: inset 0 0 0 3px rgba(214,166,74,0.85); }
+
+/* Move-target dot: ringed inside a square. */
+.dot-target {
+  width: 28%;
+  height: 28%;
+  border-radius: 9999px;
+  background: rgba(20, 14, 6, 0.45);
+  box-shadow: 0 0 0 2px rgba(214,166,74,0.55);
+}
+.dot-capture {
+  position: absolute;
+  inset: 6%;
+  border-radius: 9999px;
+  border: 3px solid rgba(208,69,69,0.7);
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.4) inset;
+}
+
+/* --- Drag/drop --- */
+.dragging {
+  cursor: grabbing !important;
+  opacity: 0.35;
+}
+.drag-ghost {
+  position: fixed;
+  pointer-events: none;
+  z-index: 60;
+  transform: translate(-50%, -50%);
+  filter: drop-shadow(0 14px 18px rgba(0,0,0,0.5));
+}
+
+/* --- Animations --- */
 @keyframes drawback-reveal {
   0% { opacity: 0; transform: translateY(20px) scale(0.96); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
@@ -48,3 +196,34 @@ body {
 .animate-reveal { animation: drawback-reveal 0.6s cubic-bezier(0.2, 0.8, 0.2, 1); }
 
 .no-tap-highlight { -webkit-tap-highlight-color: transparent; }
+
+/* Headings should sit above the noise overlay */
+main, nav, header, footer { position: relative; z-index: 2; }
+
+/* Selection */
+::selection { background: rgba(214,166,74,0.35); color: var(--paper); }
+
+/* Subtle scrollbar */
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb { background: rgba(198,155,61,0.18); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(198,155,61,0.32); }
+::-webkit-scrollbar-track { background: transparent; }
+
+/* Tarot-card ornamental corner */
+.card-corner {
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  border-color: rgba(198,155,61,0.55);
+  pointer-events: none;
+}
+.card-corner.tl { top: 8px; left: 8px; border-top: 1px solid; border-left: 1px solid; }
+.card-corner.tr { top: 8px; right: 8px; border-top: 1px solid; border-right: 1px solid; }
+.card-corner.bl { bottom: 8px; left: 8px; border-bottom: 1px solid; border-left: 1px solid; }
+.card-corner.br { bottom: 8px; right: 8px; border-bottom: 1px solid; border-right: 1px solid; }
+
+/* Sigil ring (decorative) */
+.sigil {
+  background: conic-gradient(from 0deg, transparent 0 30%, rgba(198,155,61,0.25) 30% 33%, transparent 33% 60%, rgba(198,155,61,0.18) 60% 63%, transparent 63%);
+  border-radius: 9999px;
+}

@@ -10,27 +10,23 @@ interface Props {
   ownerLabel?: string;
 }
 
-const TIER_LABEL = ["", "Trivial", "Easy", "Medium", "Hard", "Brutal"];
+const TIER_LABEL = ["", "Trivial", "Easy", "Common", "Severe", "Brutal"];
+const TIER_ROMAN = ["", "I", "II", "III", "IV", "V"];
 
 export function DrawbackCard({ drawback, revealed = true, compact = false, ownerLabel }: Props) {
   if (!revealed) {
     return (
-      <div className="card-glass rounded-2xl p-5 border border-white/10">
+      <div className="relative plate p-5 overflow-hidden">
+        <Corners />
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-full bg-ink-800 flex items-center justify-center text-xl">
-            ?
-          </div>
+          <div className="w-12 h-12 rounded-full border border-gold/40 flex items-center justify-center font-display text-2xl text-gold/70 italic">?</div>
           <div>
-            <div className="text-xs uppercase tracking-wide text-white/40">
-              {ownerLabel ?? "Opponent"}
-            </div>
-            <div className="font-display font-semibold text-white/70">
-              Hidden drawback
-            </div>
+            <div className="smallcaps text-[11px] text-parchment-400">{ownerLabel ?? "Opponent"}</div>
+            <div className="font-display text-xl text-parchment/80 italic">A sealed drawback</div>
           </div>
         </div>
-        <p className="mt-3 text-sm text-white/40 italic">
-          Their secret rule is revealed when the game ends.
+        <p className="mt-3 text-sm text-parchment-300/70 italic leading-relaxed">
+          Their secret rule shall be unsealed when the game ends.
         </p>
       </div>
     );
@@ -40,34 +36,52 @@ export function DrawbackCard({ drawback, revealed = true, compact = false, owner
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
-      className={`card-glass rounded-2xl p-5 border tier-bg-${drawback.tier}`}
+      className={`relative plate p-5 overflow-hidden tier-bg-${drawback.tier} border`}
     >
+      <Corners />
       <div className="flex items-start justify-between gap-3">
-        <div>
-          <div className="text-xs uppercase tracking-wide text-white/40">
+        <div className="min-w-0">
+          <div className="smallcaps text-[11px] text-parchment-400">
             {ownerLabel ?? "Your drawback"}
           </div>
-          <div className={`font-display text-xl font-semibold tier-${drawback.tier}`}>
+          <div className={`font-display text-2xl leading-tight tier-${drawback.tier}`}>
             {drawback.name}
           </div>
         </div>
         <span
-          className={`text-[10px] font-semibold uppercase tracking-wider px-2 py-1 rounded-full tier-bg-${drawback.tier} tier-${drawback.tier} border`}
+          className={`font-display italic text-sm px-2.5 py-0.5 rounded-sm border tier-bg-${drawback.tier} tier-${drawback.tier}`}
+          title={`Tier ${drawback.tier}: ${TIER_LABEL[drawback.tier]}`}
         >
-          {TIER_LABEL[drawback.tier]}
+          {TIER_ROMAN[drawback.tier]}
         </span>
       </div>
-      <p className="mt-3 text-sm leading-relaxed text-white/80">
+      <div className="rule-ornament my-3 text-[10px]">
+        <span className="font-display italic">{TIER_LABEL[drawback.tier]}</span>
+      </div>
+      <p className="text-[15px] leading-relaxed text-parchment/90">
         {drawback.description}
       </p>
       {!compact && drawback.flavor && (
-        <p className="mt-2 text-xs italic text-white/50">"{drawback.flavor}"</p>
+        <p className="mt-3 text-[13px] italic text-parchment-300/80 font-display">
+          &ldquo;{drawback.flavor}&rdquo;
+        </p>
       )}
       {!drawback.implemented && (
-        <div className="mt-3 text-[10px] uppercase tracking-wider text-amber-400/80">
-          ⚙ Engine implementation coming soon
+        <div className="mt-3 smallcaps text-[10px] text-gold/80">
+          Engine implementation pending
         </div>
       )}
     </motion.div>
+  );
+}
+
+function Corners() {
+  return (
+    <>
+      <span className="card-corner tl" />
+      <span className="card-corner tr" />
+      <span className="card-corner bl" />
+      <span className="card-corner br" />
+    </>
   );
 }

@@ -23,19 +23,27 @@ export default function PlayPage() {
 
   return (
     <main className="min-h-screen">
-      <nav className="px-6 py-5 max-w-6xl mx-auto flex items-center justify-between">
-        <Link href="/" className="font-display font-bold text-xl tracking-tight">
-          drawback<span className="text-accent">chess</span>
+      <nav className="px-6 py-6 max-w-6xl mx-auto flex items-center justify-between">
+        <Link href="/" className="font-display text-2xl tracking-tight">
+          drawback<span className="italic text-gold-leaf">chess</span>
         </Link>
-        <Link href="/codex" className="text-sm text-white/60 hover:text-white">Codex</Link>
+        <Link href="/codex" className="text-sm font-display italic text-parchment hover:text-gold-leaf">The Codex</Link>
       </nav>
 
       <section className="max-w-2xl mx-auto px-6 py-10">
-        <h1 className="font-display text-4xl font-bold">New game</h1>
-        <p className="text-white/60 mt-2">Play against the local AI. Multiplayer is coming.</p>
+        <div className="smallcaps text-[11px] text-parchment-400">a fresh hand</div>
+        <h1 className="font-display text-5xl mt-1">New game.</h1>
+        <p className="mt-3 text-parchment-300/85 italic font-display">
+          Sit at the cabinet. The dealer will assign your curse, and the AI&apos;s.
+        </p>
 
-        <div className="mt-8 space-y-6">
-          <Group label="Difficulty">
+        <div className="mt-10 plate p-6 sm:p-7 space-y-7 relative">
+          <span className="card-corner tl" />
+          <span className="card-corner tr" />
+          <span className="card-corner bl" />
+          <span className="card-corner br" />
+
+          <Group label="Cabinet difficulty">
             {(["easy", "medium", "hard"] as const).map((d) => (
               <Pill key={d} selected={difficulty === d} onClick={() => setDifficulty(d)}>
                 {d[0].toUpperCase() + d.slice(1)}
@@ -43,7 +51,7 @@ export default function PlayPage() {
             ))}
           </Group>
 
-          <Group label="Your color">
+          <Group label="Your colour">
             <Pill selected={color === "w"} onClick={() => setColor("w")}>White</Pill>
             <Pill selected={color === "random"} onClick={() => setColor("random")}>Random</Pill>
             <Pill selected={color === "b"} onClick={() => setColor("b")}>Black</Pill>
@@ -59,8 +67,8 @@ export default function PlayPage() {
           </Group>
 
           <div>
-            <div className="text-xs uppercase tracking-wide text-white/40 mb-2">
-              Or pick a specific drawback to practice
+            <div className="smallcaps text-[11px] text-parchment-400 mb-2">
+              or pick a specific drawback to study
             </div>
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 max-h-72 overflow-y-auto pr-1">
               {PLAYABLE_DRAWBACKS.map((d) => (
@@ -68,14 +76,14 @@ export default function PlayPage() {
                   key={d.id}
                   onClick={() => setDrawbackId(d.id)}
                   className={
-                    "text-left p-3 rounded-lg border text-sm transition " +
+                    "text-left p-3 rounded-sm border transition " +
                     (drawbackId === d.id
                       ? `tier-bg-${d.tier} border-2`
-                      : "border-white/10 hover:border-white/20")
+                      : "border-parchment/15 hover:border-parchment/30 bg-ink-900/40")
                   }
                 >
-                  <div className={`font-semibold tier-${d.tier}`}>{d.name}</div>
-                  <div className="text-[11px] text-white/40 mt-0.5 line-clamp-2">{d.description}</div>
+                  <div className={`font-display text-base tier-${d.tier}`}>{d.name}</div>
+                  <div className="text-[11px] text-parchment-300/70 mt-0.5 line-clamp-2 leading-snug">{d.description}</div>
                 </button>
               ))}
             </div>
@@ -83,9 +91,9 @@ export default function PlayPage() {
 
           <button
             onClick={start}
-            className="w-full py-3 rounded-xl bg-accent text-ink-950 font-semibold hover:bg-accent-glow transition"
+            className="w-full py-3.5 rounded-sm btn-leaf font-display text-lg font-semibold"
           >
-            Start game
+            Deal me in
           </button>
         </div>
       </section>
@@ -96,7 +104,7 @@ export default function PlayPage() {
 function Group({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div>
-      <div className="text-xs uppercase tracking-wide text-white/40 mb-2">{label}</div>
+      <div className="smallcaps text-[11px] text-parchment-400 mb-2">{label}</div>
       <div className="flex flex-wrap gap-2">{children}</div>
     </div>
   );
@@ -111,10 +119,10 @@ function Pill({
     <button
       onClick={onClick}
       className={
-        "px-4 py-2 rounded-lg border transition " +
+        "px-4 py-2 rounded-sm border font-display italic transition " +
         (selected
-          ? "bg-accent/15 border-accent text-accent-glow"
-          : "border-white/10 text-white/70 hover:border-white/20")
+          ? "bg-gold/15 border-gold text-gold-leaf"
+          : "border-parchment/15 text-parchment-200 hover:border-parchment/30")
       }
     >
       {children}

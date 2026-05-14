@@ -96,7 +96,7 @@ const STUBS: Stub[] = [
   { id: "scouting_ahead", name: "Scouting Ahead", description: "As long as you have a pawn, non-pawns can't go ahead of your most advanced pawn.", tier: 4 },
   { id: "spice_of_life", name: "Spice of Life", description: "Can't move same piece type twice in a row.", tier: 3 },
   { id: "warlord", name: "Warlord", description: "From turn 12 onward, your king can't be on the first two ranks.", tier: 4 },
-  { id: "medusa", name: "Medusa", description: "Pieces attacked by opponent's queen are stone — can't move.", tier: 4 },
+  { id: "medusa", name: "Medusa", description: "Pieces attacked by opponent's queen are stone; they cannot move.", tier: 4 },
   { id: "fischer_random_endgame", name: "Fischer Random Endgame", description: "By move 20, all your non-pawns must be on home row AND on a square they couldn't have started on.", tier: 5 },
   { id: "centralized_command", name: "Centralized Command", description: "Can only capture if you moved your king in last 3 turns.", tier: 4 },
   { id: "stand_your_ground", name: "Stand Your Ground", description: "Pieces can only capture if attacked.", tier: 4 },
@@ -148,7 +148,7 @@ const STUBS: Stub[] = [
   { id: "alternator", name: "Alternator", description: "Must alternate pawn and non-pawn moves.", tier: 4 },
 
   // BRUTAL
-  { id: "obsession", name: "Obsession", description: "Each turn a random square — if you can move to it, you must.", tier: 5 },
+  { id: "obsession", name: "Obsession", description: "Each turn, a random square. If you can move to it, you must.", tier: 5 },
   { id: "boxing_with_shadow", name: "Boxing with Shadow", description: "When opponent moves, if you can move to the square they vacated, you must.", tier: 5 },
   { id: "noble_steed", name: "Noble Steed", description: "Non-knight pieces can only move if adjacent to one of your knights.", tier: 5 },
   { id: "deer_in_headlights", name: "Deer in the Headlights", description: "Can't move pieces that are under attack.", tier: 5 },
@@ -172,7 +172,7 @@ const STUBS: Stub[] = [
   { id: "royal_berth", name: "Royal Berth", description: "Can't place a piece adjacent to your king.", tier: 4 },
   { id: "velociraptor", name: "Velociraptor", description: "Can only capture a piece type if opponent moved that type in their last 3 moves.", tier: 5 },
   { id: "secret_garden", name: "Secret Garden", description: "Two of your pawns have secret gardens. Don't trespass.", tier: 5 },
-  { id: "thunderdome", name: "Thunderdome", description: "Center 16 squares are the thunderdome — pieces enter but rarely leave.", tier: 5 },
+  { id: "thunderdome", name: "Thunderdome", description: "Center 16 squares are the thunderdome. Pieces enter; pieces rarely leave.", tier: 5 },
   { id: "indecisive", name: "Indecisive", description: "Pieces can't capture if they have multiple possible capture moves.", tier: 4 },
   { id: "unrequited_love", name: "Unrequited Love", description: "King can't move away from queen; queen can't move toward king.", tier: 5 },
   { id: "torpedoes", name: "Torpedoes", description: "If you made a non-capturing pawn move last turn and can move it again, you must.", tier: 4 },

@@ -349,7 +349,7 @@ export const COWARDLY: Drawback = db({
 export const HAND_AND_BRAINLESS: Drawback = db({
   id: "hand_and_brainless",
   name: "Hand and Brainless",
-  description: "Each turn, a random piece type — you must move that type if possible.",
+  description: "Each turn, a random piece type. You must move that type if possible.",
   flavor: "A voice in your head names a piece. You obey.",
   tier: 5,
   icon: "dice-5",

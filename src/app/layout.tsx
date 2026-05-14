@@ -1,24 +1,40 @@
 import type { Metadata } from "next";
+import { Cormorant_Garamond, IM_Fell_English, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 
+const display = Cormorant_Garamond({
+  subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
+  variable: "--font-display",
+  display: "swap",
+});
+
+const body = IM_Fell_English({
+  subsets: ["latin"],
+  weight: ["400"],
+  style: ["normal", "italic"],
+  variable: "--font-body",
+  display: "swap",
+});
+
+const mono = JetBrains_Mono({
+  subsets: ["latin"],
+  weight: ["400", "500"],
+  variable: "--font-mono",
+  display: "swap",
+});
+
 export const metadata: Metadata = {
-  title: "Drawback Chess — Chess, but with secret rules",
+  title: "Drawback Chess · An almanac of cursed games",
   description:
-    "A modern, modern reimagining of Drawback Chess. Every player has a secret rule. Find theirs before they find yours.",
+    "Each player is dealt a secret rule that breaks the game. Find theirs before they find yours.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="en">
-      <head>
-        <link rel="preconnect" href="https://fonts.googleapis.com" />
-        <link rel="preconnect" href="https://fonts.gstatic.com" crossOrigin="anonymous" />
-        <link
-          href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;600;700&display=swap"
-          rel="stylesheet"
-        />
-      </head>
-      <body className="no-tap-highlight">{children}</body>
+    <html lang="en" className={`${display.variable} ${body.variable} ${mono.variable}`}>
+      <body className="no-tap-highlight font-body parchment-noise">{children}</body>
     </html>
   );
 }
