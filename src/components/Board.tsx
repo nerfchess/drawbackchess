@@ -259,12 +259,22 @@ export function Board({
                 )}
 
                 {f === (orientation === "w" ? 0 : 7) && (
-                  <span className="absolute top-0.5 left-1 text-[10px] font-mono text-black/40 pointer-events-none">
+                  <span
+                    className={
+                      "absolute top-0.5 left-1 text-[10px] font-mono font-semibold pointer-events-none " +
+                      (isLight ? "text-[#4a3826]" : "text-[#eeeed2]/85")
+                    }
+                  >
                     {r + 1}
                   </span>
                 )}
                 {r === (orientation === "w" ? 0 : 7) && (
-                  <span className="absolute bottom-0.5 right-1 text-[10px] font-mono text-black/40 pointer-events-none">
+                  <span
+                    className={
+                      "absolute bottom-0.5 right-1 text-[10px] font-mono font-semibold pointer-events-none " +
+                      (isLight ? "text-[#4a3826]" : "text-[#eeeed2]/85")
+                    }
+                  >
                     {"abcdefgh"[f]}
                   </span>
                 )}

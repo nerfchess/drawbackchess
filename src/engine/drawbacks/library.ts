@@ -2,7 +2,7 @@ import { Drawback, Tier } from "../drawback";
 import { ALL_IMPLEMENTED, IMPLEMENTED_BY_ID } from "./implemented";
 
 // Stub drawbacks: cataloged for the Codex but not yet wired into the engine.
-// (`implemented: false` — game flow will reject if attempted in play.)
+// (`implemented: false`; game flow will reject if attempted in play.)
 
 type Stub = {
   id: string;

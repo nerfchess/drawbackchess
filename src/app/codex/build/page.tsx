@@ -87,30 +87,27 @@ export default function BuilderPage() {
     <main className="min-h-screen pb-20">
       <nav className="px-6 py-6 max-w-6xl mx-auto flex items-center justify-between">
         <Link href="/" className="font-display text-2xl tracking-tight">
-          drawback<span className="italic text-gold-leaf">chess</span>
+          drawback<span className="text-gold-leaf">chess</span>
         </Link>
-        <Link href="/codex" className="text-sm font-display italic text-parchment hover:text-gold-leaf">
-          ← Back to codex
+        <Link href="/codex" className="px-3 py-1.5 rounded-full text-sm font-display hover:bg-white/5 text-parchment">
+          ← All the rules
         </Link>
       </nav>
 
       <section className="max-w-4xl mx-auto px-6">
         <div className="smallcaps text-[11px] text-parchment-400">workshop</div>
-        <h1 className="font-display text-5xl mt-1">Forge a drawback.</h1>
-        <p className="mt-3 italic font-display text-parchment-200/90">
-          Combine primitive rules. Save and play it in a sandbox game against the AI. Unrated.
+        <h1 className="font-display text-5xl mt-1">Build a rule</h1>
+        <p className="mt-3 font-display text-parchment-200">
+          Combine primitive rules. Save it and play a sandbox game against the bot. Unrated.
         </p>
 
-        <div className="mt-7 plate p-5 sm:p-6 space-y-5 relative">
-          <span className="card-corner tl" /><span className="card-corner tr" />
-          <span className="card-corner bl" /><span className="card-corner br" />
-
+        <div className="mt-7 plate p-5 sm:p-6 space-y-5">
           <div>
             <div className="smallcaps text-[11px] text-parchment-400 mb-1">Name</div>
             <input
               value={name}
               onChange={(e) => setName(e.target.value.slice(0, 40))}
-              className="bg-ink-900/60 border border-parchment/15 rounded-sm px-3 py-2 text-base font-display w-full focus:outline-none focus:border-gold/60 text-parchment"
+              className="bg-ink-900/60 border border-white/15 rounded-full px-4 py-2 text-base font-display w-full focus:outline-none focus:border-gold/60 text-parchment"
             />
           </div>
 
@@ -118,11 +115,11 @@ export default function BuilderPage() {
             <div className="smallcaps text-[11px] text-parchment-400 mb-2">Rules ({rules.length})</div>
             <div className="space-y-2">
               {rules.length === 0 && (
-                <div className="text-parchment-300/60 italic text-sm">No rules yet — add one below.</div>
+                <div className="text-parchment-300/60 text-sm">No rules yet. Add one below.</div>
               )}
               {rules.map((r, i) => (
-                <div key={i} className="flex flex-wrap items-center gap-2 p-3 bg-ink-900/40 border border-parchment/10 rounded-sm">
-                  <span className="font-display italic text-sm text-parchment-200/90 flex-1 min-w-[180px]">
+                <div key={i} className="flex flex-wrap items-center gap-2 p-3 bg-ink-900/40 border border-white/10 rounded-2xl">
+                  <span className="font-display text-sm text-parchment-200 flex-1 min-w-[180px]">
                     {describeCustom({ id: "_", name: "_", rules: [r] })}
                   </span>
                   {"piece" in r && (
@@ -131,7 +128,7 @@ export default function BuilderPage() {
                       onChange={(e) =>
                         updateRule(i, { ...(r as { kind: typeof r.kind; piece: PieceType }), piece: e.target.value as PieceType })
                       }
-                      className="bg-ink-800 border border-parchment/15 text-parchment text-sm rounded-sm px-2 py-1"
+                      className="bg-ink-800 border border-white/15 text-parchment text-sm rounded-full px-3 py-1"
                     >
                       {PIECES.map((p) => (
                         <option key={p.v} value={p.v}>{p.label}</option>
@@ -144,7 +141,7 @@ export default function BuilderPage() {
                       onChange={(e) =>
                         updateRule(i, { ...(r as { kind: "ban_file"; file: number }), file: parseInt(e.target.value) })
                       }
-                      className="bg-ink-800 border border-parchment/15 text-parchment text-sm rounded-sm px-2 py-1"
+                      className="bg-ink-800 border border-white/15 text-parchment text-sm rounded-full px-3 py-1"
                     >
                       {Array.from({ length: 8 }).map((_, f) => (
                         <option key={f} value={f}>{"abcdefgh"[f]}</option>
@@ -157,7 +154,7 @@ export default function BuilderPage() {
                       onChange={(e) =>
                         updateRule(i, { ...(r as { kind: "ban_rank"; rank: number }), rank: parseInt(e.target.value) })
                       }
-                      className="bg-ink-800 border border-parchment/15 text-parchment text-sm rounded-sm px-2 py-1"
+                      className="bg-ink-800 border border-white/15 text-parchment text-sm rounded-full px-3 py-1"
                     >
                       {Array.from({ length: 8 }).map((_, k) => (
                         <option key={k} value={k}>{k + 1}</option>
@@ -166,9 +163,13 @@ export default function BuilderPage() {
                   )}
                   <button
                     onClick={() => removeRule(i)}
-                    className="text-xs font-display italic text-oxblood-glow hover:text-parchment"
+                    aria-label="Remove rule"
+                    className="w-7 h-7 inline-flex items-center justify-center rounded-full text-oxblood-glow hover:bg-oxblood/15"
                   >
-                    remove
+                    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" aria-hidden>
+                      <line x1="6" y1="6" x2="18" y2="18" />
+                      <line x1="18" y1="6" x2="6" y2="18" />
+                    </svg>
                   </button>
                 </div>
               ))}
@@ -178,7 +179,7 @@ export default function BuilderPage() {
                 <button
                   key={t.kind}
                   onClick={() => addRule(t.kind)}
-                  className="px-3 py-1.5 rounded-sm border border-parchment/15 hover:border-gold/50 text-xs font-display italic text-parchment-200"
+                  className="px-3 py-1.5 rounded-full border border-white/15 hover:border-gold/50 hover:bg-white/5 text-xs font-display text-parchment-200 transition"
                 >
                   + {t.label}
                 </button>
@@ -187,13 +188,13 @@ export default function BuilderPage() {
           </div>
 
           <div className="rule-ornament text-[10px]">
-            <span className="font-display italic">preview</span>
+            <span className="font-display">preview</span>
           </div>
 
           <div className="plate p-4 border-gold/30">
             <div className="font-display text-xl text-gold-leaf">{preview.name}</div>
             <p className="mt-1 text-sm text-parchment-200/95">
-              {rules.length ? describeCustom(preview) : <span className="italic text-parchment-300/60">No rules yet.</span>}
+              {rules.length ? describeCustom(preview) : <span className="text-parchment-300/60">No rules yet.</span>}
             </p>
           </div>
 
@@ -201,14 +202,14 @@ export default function BuilderPage() {
             <button
               onClick={save}
               disabled={!rules.length}
-              className="px-5 py-2.5 rounded-sm btn-leaf font-display font-semibold disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 rounded-full btn-leaf font-display disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Save curse
+              Save rule
             </button>
             <button
               onClick={() => play(preview)}
               disabled={!rules.length}
-              className="px-5 py-2.5 rounded-sm btn-ghost font-display italic disabled:opacity-50 disabled:cursor-not-allowed"
+              className="px-6 py-3 rounded-full btn-ghost font-display disabled:opacity-50 disabled:cursor-not-allowed"
             >
               Test in sandbox
             </button>
@@ -218,23 +219,23 @@ export default function BuilderPage() {
         {saved.length > 0 && (
           <>
             <div className="mt-10 rule-ornament text-[11px] text-parchment-400">
-              <span className="font-display italic">your saved curses</span>
+              <span className="font-display">your saved rules</span>
             </div>
             <div className="mt-4 grid sm:grid-cols-2 gap-3">
               {saved.map((d) => (
-                <div key={d.id} className="plate p-4 relative">
+                <div key={d.id} className="plate p-4">
                   <div className="font-display text-xl text-gold-leaf">{d.name}</div>
                   <p className="text-sm text-parchment-200/95 mt-1">{describeCustom(d)}</p>
                   <div className="mt-3 flex gap-2">
                     <button
                       onClick={() => play(d)}
-                      className="px-3 py-1.5 rounded-sm btn-leaf text-xs font-display font-semibold"
+                      className="px-4 py-1.5 rounded-full btn-leaf text-xs font-display"
                     >
                       Play
                     </button>
                     <button
                       onClick={() => erase(d.id)}
-                      className="px-3 py-1.5 rounded-sm btn-ghost text-xs font-display italic"
+                      className="px-4 py-1.5 rounded-full btn-ghost text-xs font-display"
                     >
                       Delete
                     </button>

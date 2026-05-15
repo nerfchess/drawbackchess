@@ -54,7 +54,7 @@ const BISHOP_DIRS = [[1, 1], [1, -1], [-1, 1], [-1, -1]];
 const ROOK_DIRS = [[1, 0], [-1, 0], [0, 1], [0, -1]];
 const KING_DIRS = [...BISHOP_DIRS, ...ROOK_DIRS];
 
-// Squares attacked by `color` — used for detecting check (informational) and "passes through attacked square" for king en passant.
+// Squares attacked by `color`; used for detecting check (informational) and "passes through attacked square" for king en passant.
 export function attackedBy(board: BoardState, color: Color): Set<Square> {
   const attacked = new Set<Square>();
   for (let sq = 0; sq < 64; sq++) {
@@ -232,7 +232,7 @@ export function generateMoves(board: BoardState): Move[] {
           const tp = board.pieces[tsq];
           if (!tp || tp.color === opp) add(tsq);
         }
-        // castling — in drawback chess, can castle through/into/out of check
+        // castling; in drawback chess, can castle through/into/out of check
         const homeR = me === "w" ? 0 : 7;
         if (r === homeR && f === 4) {
           const ck = me === "w" ? board.castling.wk : board.castling.bk;
@@ -335,7 +335,7 @@ export function makeMove(board: BoardState, move: Move): BoardState {
     nb.epTarget = (move.from + move.to) >> 1;
   }
 
-  // King passthrough tracking — only set when castling, and only if king path passed through an attacked square OR started in check.
+  // King passthrough tracking; only set when castling, and only if king path passed through an attacked square OR started in check.
   // We always set the king-pass-through for the squares EXCLUDING the start and end? Actually rule: opponent can capture on any square the king passed through. Include start if king was in check.
   nb.kingPassThrough = [];
   nb.kingPassColor = null;

@@ -33,9 +33,26 @@ function pickRandomDrawback(): Drawback {
 
 export default function GamePageWrapper() {
   return (
-    <Suspense fallback={<main className="min-h-screen flex items-center justify-center text-parchment-300/70 italic">Loading game…</main>}>
+    <Suspense fallback={<LoadingPanel />}>
       <GamePage />
     </Suspense>
+  );
+}
+
+function LoadingPanel() {
+  return (
+    <main className="min-h-screen flex items-center justify-center px-6">
+      <div className="relative flex flex-col items-center">
+        <div className="flex gap-1.5 mb-3">
+          <span className="w-2 h-2 rounded-full bg-gold-leaf animate-bob" />
+          <span className="w-2 h-2 rounded-full bg-verdigris-glow animate-bob" style={{ animationDelay: "0.15s" }} />
+          <span className="w-2 h-2 rounded-full bg-bruise-glow animate-bob" style={{ animationDelay: "0.3s" }} />
+        </div>
+        <div className="font-display text-xl text-parchment animate-flicker">
+          Dealing the cards
+        </div>
+      </div>
+    </main>
   );
 }
 
@@ -139,11 +156,7 @@ function GamePage() {
   }, [game, myColor, difficulty]);
 
   if (!game) {
-    return (
-      <main className="min-h-screen flex items-center justify-center text-parchment-300/70 italic font-display text-2xl">
-        Loading game…
-      </main>
-    );
+    return <LoadingPanel />;
   }
 
   const myDrawback = myColor === "w" ? game.white.drawback : game.black.drawback;
@@ -183,7 +196,7 @@ function GamePage() {
     <main className="min-h-screen pb-12">
       <nav className="px-4 sm:px-6 py-5 max-w-6xl mx-auto flex items-center justify-between">
         <Link href="/" className="font-display text-2xl tracking-tight">
-          drawback<span className="italic text-gold-leaf">chess</span>
+          drawback<span className="text-gold-leaf">chess</span>
         </Link>
         <div className="flex items-center gap-4">
           <div className="smallcaps text-[11px] text-parchment-400 hidden sm:block">
@@ -192,9 +205,22 @@ function GamePage() {
           <button
             onClick={toggleMute}
             aria-label={muted ? "Unmute" : "Mute"}
-            className="px-2 py-1 text-xs rounded-sm btn-ghost font-mono"
+            title={muted ? "Sound off" : "Sound on"}
+            className="w-9 h-9 inline-flex items-center justify-center rounded-full btn-ghost"
           >
-            {muted ? "🔇" : "🔔"}
+            {muted ? (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <line x1="22" y1="9" x2="16" y2="15" />
+                <line x1="16" y1="9" x2="22" y2="15" />
+              </svg>
+            ) : (
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+                <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+                <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+              </svg>
+            )}
           </button>
         </div>
       </nav>
@@ -202,7 +228,7 @@ function GamePage() {
       <div className="max-w-6xl mx-auto px-3 sm:px-6 grid lg:grid-cols-[1fr_340px] gap-6">
         <div className="space-y-4">
           <div className="flex items-center justify-between text-sm">
-            <span className="font-display italic text-parchment-300/90">
+            <span className="font-display text-parchment-200">
               <span className="smallcaps text-[11px] text-parchment-400 mr-2">Turn</span>
               <span className={game.board.turn === myColor ? "text-gold-leaf font-semibold" : "text-bruise-glow font-semibold"}>
                 {whoseTurn}
@@ -210,7 +236,7 @@ function GamePage() {
             </span>
             <button
               onClick={onResign}
-              className="px-3 py-1 rounded-sm btn-ghost text-xs font-display italic"
+              className="px-4 py-1.5 rounded-full border border-oxblood/40 bg-oxblood/10 text-oxblood-glow hover:bg-oxblood/20 hover:border-oxblood/70 transition text-xs font-display font-semibold tracking-wide"
             >
               Resign
             </button>
@@ -226,8 +252,8 @@ function GamePage() {
                   : "border-gold/40 bg-gold/10")
               }
             >
-              <span aria-hidden="true" className="text-gold-leaf font-display italic text-xl">!</span>
-              <span className="font-display italic text-[15px] text-parchment">
+              <span aria-hidden="true" className="text-gold-leaf font-display font-bold text-xl leading-none">!</span>
+              <span className="font-display text-[15px] text-parchment">
                 {hint.text}
               </span>
             </div>

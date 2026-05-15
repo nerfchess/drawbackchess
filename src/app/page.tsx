@@ -26,7 +26,7 @@ export default function HomePage() {
 
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-parchment-200">
             Every game, you get a secret rule that changes how you can move.
-            So does your opponent. Win the game — and figure out their rule before they figure out yours.
+            So does your opponent. Win the game, and figure out their rule before they figure out yours.
           </p>
 
           <div className="mt-8 flex flex-wrap items-center gap-3">
@@ -77,7 +77,7 @@ export default function HomePage() {
             {
               n: "2",
               t: "Modified rules",
-              d: "Forget checkmate. The king is just another piece — capture it. Castle through check. King en passant exists.",
+              d: "Forget checkmate. The king is just another piece you can capture. Castle through check. King en passant exists.",
               c: "text-gold-leaf",
             },
             {

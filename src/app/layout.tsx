@@ -25,7 +25,7 @@ const mono = JetBrains_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Drawback Chess — chess with secret rules",
+  title: "Drawback Chess · chess with secret rules",
   description:
     "Every player gets a secret rule. Win the game and figure out theirs before they figure out yours.",
 };

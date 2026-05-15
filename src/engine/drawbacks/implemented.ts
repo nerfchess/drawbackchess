@@ -94,7 +94,7 @@ export const OUT_OF_BREATH: Drawback = db({
     if (s.kingMoves >= 1) return moves.filter((m) => m.piece !== "k");
     return moves;
   },
-  // Increment when we make a king move — done in onTurnStart of the SAME color (next turn we see history).
+  // Increment when we make a king move; done in onTurnStart of the SAME color (next turn we see history).
   onTurnStart: (state, ctx) => {
     const s = state as { kingMoves: number };
     const kingMoves = ctx.board.history.filter((m) => m.color === ctx.me && m.piece === "k").length;
@@ -331,7 +331,7 @@ export const RISING_WATER: Drawback = db({
   filterMoves: (moves, state, ctx) => {
     const s = state as { level: number };
     if (s.level <= 0) return moves;
-    // Water rises from white's side (rank 1, rank 2, ...) regardless of color — universal water layer
+    // Water rises from white's side (rank 1, rank 2, ...) regardless of color; universal water layer
     const underwater = (sq: number) => RANK(sq) < s.level;
     return moves.filter((m) => !underwater(m.from) && !underwater(m.to));
   },
@@ -399,7 +399,7 @@ export const HAND_AND_BRAINLESS: Drawback = db({
     };
     const matching = legal.filter((m) => m.piece === s.piece);
     if (matching.length === 0) {
-      return { text: `The voice says ${names[s.piece]} — but none can move. Pick anything.`, tone: "info" };
+      return { text: `The voice says ${names[s.piece]}, but none can move. Pick anything.`, tone: "info" };
     }
     return {
       text: `The voice says: move a ${names[s.piece]}.`,
@@ -445,7 +445,7 @@ export const SLEEPY_KING: Drawback = db({
   hint: (_s, ctx) => {
     const { isInCheck } = require("../board");
     if (isInCheck(ctx.board, ctx.me)) {
-      return { text: "The king stirs — he can move while in check.", tone: "info" };
+      return { text: "The king stirs. He can move while in check.", tone: "info" };
     }
     return null;
   },

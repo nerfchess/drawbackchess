@@ -17,9 +17,8 @@ export function DrawbackCard({ drawback, revealed = true, compact = false, owner
   if (!revealed) {
     return (
       <div className="relative plate p-5 overflow-hidden">
-        <Corners />
         <div className="flex items-center gap-3">
-          <div className="w-12 h-12 rounded-full border border-gold/40 flex items-center justify-center font-display text-2xl text-gold/70 italic">?</div>
+          <div className="w-12 h-12 rounded-full border border-gold/40 bg-gold/10 flex items-center justify-center font-display text-2xl text-gold/80 font-bold">?</div>
           <div>
             <div className="smallcaps text-[11px] text-parchment-400">{ownerLabel ?? "Opponent"}</div>
             <div className="font-display text-xl text-parchment/80">Hidden rule</div>
@@ -38,7 +37,6 @@ export function DrawbackCard({ drawback, revealed = true, compact = false, owner
       animate={{ opacity: 1, y: 0 }}
       className={`relative plate p-5 overflow-hidden tier-bg-${drawback.tier} border`}
     >
-      <Corners />
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="smallcaps text-[11px] text-parchment-400">
@@ -49,20 +47,20 @@ export function DrawbackCard({ drawback, revealed = true, compact = false, owner
           </div>
         </div>
         <span
-          className={`font-display italic text-sm px-2.5 py-0.5 rounded-sm border tier-bg-${drawback.tier} tier-${drawback.tier}`}
+          className={`font-display font-bold text-sm px-2.5 py-0.5 rounded-full border tier-bg-${drawback.tier} tier-${drawback.tier}`}
           title={`Tier ${drawback.tier}: ${TIER_LABEL[drawback.tier]}`}
         >
           {TIER_ROMAN[drawback.tier]}
         </span>
       </div>
       <div className="rule-ornament my-3 text-[10px]">
-        <span className="font-display italic">{TIER_LABEL[drawback.tier]}</span>
+        <span className="font-display">{TIER_LABEL[drawback.tier]}</span>
       </div>
-      <p className="text-[15px] leading-relaxed text-parchment/90">
+      <p className="text-[15px] leading-relaxed text-parchment/95">
         {drawback.description}
       </p>
       {!compact && drawback.flavor && (
-        <p className="mt-3 text-[13px] italic text-parchment-300/80 font-display">
+        <p className="mt-3 text-[13px] text-parchment-300/85 font-display border-l-2 border-white/15 pl-3">
           &ldquo;{drawback.flavor}&rdquo;
         </p>
       )}
@@ -72,16 +70,5 @@ export function DrawbackCard({ drawback, revealed = true, compact = false, owner
         </div>
       )}
     </motion.div>
-  );
-}
-
-function Corners() {
-  return (
-    <>
-      <span className="card-corner tl" />
-      <span className="card-corner tr" />
-      <span className="card-corner bl" />
-      <span className="card-corner br" />
-    </>
   );
 }

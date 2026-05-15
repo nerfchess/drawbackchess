@@ -39,15 +39,15 @@ export function GameOver({ result, whiteDrawback, blackDrawback, myColor, onRema
         transition={{ type: "spring", damping: 22 }}
         className="plate gilt p-6 sm:p-10 max-w-3xl w-full relative overflow-hidden"
       >
-        <div className="absolute -top-24 -right-24 w-72 h-72 sigil opacity-40 animate-sigil pointer-events-none" />
-        <div className="absolute -bottom-32 -left-24 w-72 h-72 sigil opacity-30 animate-sigil pointer-events-none" style={{ animationDirection: "reverse" }} />
+        <div className="absolute -top-24 -right-24 w-72 h-72 sigil opacity-30 animate-sigil pointer-events-none" />
+        <div className="absolute -bottom-32 -left-24 w-72 h-72 sigil opacity-20 animate-sigil pointer-events-none" style={{ animationDirection: "reverse" }} />
 
         <div className="relative text-center">
           <div className="smallcaps text-[11px] text-parchment-400">Game over</div>
-          <div className={`mt-1 font-display text-6xl sm:text-7xl italic ${tone} animate-seal`}>
+          <div className={`mt-1 font-display text-6xl sm:text-7xl font-bold ${tone} animate-seal`}>
             {headline}
           </div>
-          <div className="mt-2 text-sm text-parchment-300 italic">{result.reason}</div>
+          <div className="mt-2 text-sm text-parchment-300">{result.reason}</div>
         </div>
 
         <div className="mt-7 rule-ornament text-[11px]">
@@ -62,21 +62,21 @@ export function GameOver({ result, whiteDrawback, blackDrawback, myColor, onRema
         <div className="mt-7 flex flex-col sm:flex-row gap-2 justify-center">
           <button
             onClick={onRematch}
-            className="px-6 py-2.5 rounded-sm btn-leaf font-display text-base font-semibold"
+            className="px-6 py-3 rounded-full btn-leaf font-display text-base"
           >
             New game
           </button>
           <Link
             href="/codex"
-            className="px-6 py-2.5 rounded-sm btn-ghost font-display italic text-center"
+            className="px-6 py-3 rounded-full btn-ghost font-display text-center"
           >
-            The Codex
+            All the rules
           </Link>
           <Link
             href="/"
-            className="px-6 py-2.5 rounded-sm btn-ghost font-display italic text-center"
+            className="px-6 py-3 rounded-full btn-ghost font-display text-center"
           >
-            Return
+            Home
           </Link>
         </div>
       </motion.div>

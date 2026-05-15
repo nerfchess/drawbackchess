@@ -38,48 +38,44 @@ export default function TutorialPage() {
     <main className="min-h-screen pb-20">
       <nav className="px-6 py-6 max-w-3xl mx-auto flex items-center justify-between">
         <Link href="/" className="font-display text-2xl tracking-tight">
-          drawback<span className="italic text-gold-leaf">chess</span>
+          drawback<span className="text-gold-leaf">chess</span>
         </Link>
-        <Link href="/play" className="text-sm font-display italic text-parchment hover:text-gold-leaf">Play</Link>
+        <Link href="/play" className="px-3 py-1.5 rounded-full text-sm font-display hover:bg-white/5 text-parchment">Play</Link>
       </nav>
       <section className="max-w-3xl mx-auto px-6 pt-4">
         <div className="smallcaps text-[11px] text-parchment-400">how to play</div>
         <h1 className="font-display text-5xl sm:text-6xl mt-1">House rules</h1>
         <p className="mt-5 text-[16px] leading-[1.7] text-parchment-200">
-          Drawback Chess is chess — until it isn't. The six rules below are everything you need to know.
+          Drawback Chess is chess, until it isn't. The six rules below are everything you need to know.
           Everything else is in your secret rule.
         </p>
         <div className="mt-9 space-y-3">
           {RULES.map((r) => (
-            <div key={r.n} className="plate p-5 sm:p-6 relative">
-              <span className="card-corner tl" />
-              <span className="card-corner tr" />
-              <span className="card-corner bl" />
-              <span className="card-corner br" />
+            <div key={r.n} className="plate p-5 sm:p-6">
               <div className="flex items-baseline gap-3">
-                <span className="font-display italic text-gold-leaf text-2xl">{r.n}.</span>
+                <span className="font-display font-bold text-gold-leaf text-2xl tabular-nums w-8 shrink-0">{r.n}.</span>
                 <div className="font-display text-2xl text-parchment leading-tight">{r.t}</div>
               </div>
-              <p className="mt-2 ml-9 text-[15px] leading-relaxed text-parchment-200/90">{r.d}</p>
+              <p className="mt-2 ml-11 text-[15px] leading-relaxed text-parchment-200/90">{r.d}</p>
             </div>
           ))}
         </div>
         <div className="mt-9 flex flex-wrap gap-3">
           <Link
             href="/tutorial/walkthrough"
-            className="px-6 py-2.5 rounded-sm btn-leaf font-display font-semibold"
+            className="px-6 py-3 rounded-full btn-leaf font-display"
           >
             Try the interactive lessons
           </Link>
           <Link
             href="/play"
-            className="px-6 py-2.5 rounded-sm btn-ghost font-display italic"
+            className="px-6 py-3 rounded-full btn-ghost font-display"
           >
             Skip and play
           </Link>
           <Link
             href="/codex"
-            className="px-6 py-2.5 rounded-sm btn-ghost font-display italic"
+            className="px-6 py-3 rounded-full btn-ghost font-display"
           >
             Browse all rules
           </Link>

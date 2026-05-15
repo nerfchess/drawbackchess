@@ -39,7 +39,7 @@ const STEPS: Step[] = [
   {
     title: "I. Capture the king.",
     intro:
-      "There is no checkmate. The king is just another piece on the board — when you can take him, you take him. Your white rook stands on e1. The black king awaits on e4.",
+      "There is no checkmate. The king is just another piece on the board: when you can take him, you take him. Your white rook stands on e1. The black king awaits on e4.",
     setup: () => {
       const b = blankBoard("w");
       place(b, SQ(4, 0), "r", "w"); // e1
@@ -55,7 +55,7 @@ const STEPS: Step[] = [
   {
     title: "II. Castle through anything.",
     intro:
-      "Standard chess forbids castling through check. Drawback Chess does not. Your kingside is being raked by a black rook — castle anyway.",
+      "Standard chess forbids castling through check. Drawback Chess does not. Your kingside is being raked by a black rook. Castle anyway.",
     setup: () => {
       const b = blankBoard("w");
       // white setup, kingside castling rights only
@@ -65,7 +65,7 @@ const STEPS: Step[] = [
       // black king
       place(b, SQ(4, 7), "k", "b"); // e8
       // black rook attacking f-file
-      place(b, SQ(5, 6), "r", "b"); // f7 — attacks f1..f6
+      place(b, SQ(5, 6), "r", "b"); // f7 attacks f1..f6
       b.castling.wk = true;
       return b;
     },
@@ -81,20 +81,20 @@ const STEPS: Step[] = [
     setup: () => {
       const b = blankBoard("b");
       // The white king just walked from e1 to e3, passing through e2.
-      // Black has a knight on c1 that attacks e2 — kep-territory.
+      // Black has a knight on c1 that attacks e2: kep-territory.
       place(b, SQ(4, 2), "k", "w"); // e3 (the king's current square)
       place(b, SQ(0, 0), "r", "w"); // a1 (just for ambience)
-      place(b, SQ(2, 0), "n", "b"); // c1 — attacks e2
+      place(b, SQ(2, 0), "n", "b"); // c1 attacks e2
       place(b, SQ(4, 7), "k", "b"); // e8
       b.kingPassThrough = [SQ(4, 1)]; // e2
       b.kingPassColor = "w";
       return b;
     },
     goalText:
-      "Black to play. The white king passed through e2 — capture him there with the knight.",
+      "Black to play. The white king passed through e2. Capture him there with the knight.",
     isComplete: (m) => m.isKingEnPassant === true || m.captured === "k",
     closing:
-      "Any move landing on a square the king passed through captures him — even though he is no longer on it.",
+      "Any move landing on a square the king passed through captures him, even though he is no longer on it.",
   },
 ];
 
@@ -136,10 +136,10 @@ export default function TutorialWalkthroughPage() {
     <main className="min-h-screen pb-20">
       <nav className="px-6 py-6 max-w-6xl mx-auto flex items-center justify-between">
         <Link href="/" className="font-display text-2xl tracking-tight">
-          drawback<span className="italic text-gold-leaf">chess</span>
+          drawback<span className="text-gold-leaf">chess</span>
         </Link>
-        <Link href="/tutorial" className="text-sm font-display italic text-parchment hover:text-gold-leaf">
-          ← Back to house rules
+        <Link href="/tutorial" className="px-3 py-1.5 rounded-full text-sm font-display hover:bg-white/5 text-parchment">
+          ← House rules
         </Link>
       </nav>
 
@@ -150,7 +150,7 @@ export default function TutorialWalkthroughPage() {
         <h1 className="font-display text-3xl sm:text-5xl mt-1">{step.title}</h1>
         <p className="mt-3 max-w-2xl text-parchment-200/95 leading-relaxed">{step.intro}</p>
         <div className="mt-4 plate p-3 px-4 inline-block border-gold/50 bg-gold/10">
-          <span className="font-display italic text-[15px] text-gold-leaf">{step.goalText}</span>
+          <span className="font-display text-[15px] text-gold-leaf">{step.goalText}</span>
         </div>
 
         <div className="mt-6 grid lg:grid-cols-[1fr_320px] gap-6">
@@ -169,9 +169,9 @@ export default function TutorialWalkthroughPage() {
                 <p className="mt-2 text-parchment leading-relaxed">{step.closing}</p>
                 <button
                   onClick={nextStep}
-                  className="mt-4 w-full py-2.5 rounded-sm btn-leaf font-display font-semibold"
+                  className="mt-4 w-full py-3 rounded-full btn-leaf font-display"
                 >
-                  {stepIx + 1 < STEPS.length ? "Next lesson →" : "Sit at the cabinet →"}
+                  {stepIx + 1 < STEPS.length ? "Next lesson →" : "Play a real game →"}
                 </button>
               </div>
             )}
@@ -179,12 +179,12 @@ export default function TutorialWalkthroughPage() {
               <div className="plate p-5">
                 <div className="smallcaps text-[11px] text-parchment-400">hint</div>
                 <p className="mt-2 text-parchment-200/95 text-sm leading-relaxed">
-                  The board has been narrowed to only the legal moves that complete this lesson.
+                  The board only highlights moves that complete this lesson.
                   Click a piece, then its destination.
                 </p>
                 <button
                   onClick={restart}
-                  className="mt-4 w-full py-2 rounded-sm btn-ghost font-display italic text-sm"
+                  className="mt-4 w-full py-2 rounded-full btn-ghost font-display text-sm"
                 >
                   Reset the position
                 </button>

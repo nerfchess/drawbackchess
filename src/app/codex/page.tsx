@@ -28,9 +28,9 @@ export default function CodexPage() {
     <main className="min-h-screen pb-20">
       <nav className="px-6 py-6 max-w-6xl mx-auto flex items-center justify-between">
         <Link href="/" className="font-display text-2xl tracking-tight">
-          drawback<span className="italic text-gold-leaf">chess</span>
+          drawback<span className="text-gold-leaf">chess</span>
         </Link>
-        <Link href="/play" className="text-sm font-display italic text-parchment hover:text-gold-leaf">Play</Link>
+        <Link href="/play" className="px-3 py-1.5 rounded-full text-sm font-display hover:bg-white/5 text-parchment">Play</Link>
       </nav>
 
       <section className="max-w-6xl mx-auto px-6 pt-4">
@@ -42,22 +42,18 @@ export default function CodexPage() {
         <div className="mt-4">
           <Link
             href="/codex/build"
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-sm btn-ghost font-display italic text-sm"
+            className="inline-flex items-center gap-2 px-4 py-2 rounded-full btn-ghost font-display text-sm"
           >
             <span aria-hidden="true">✦</span> Build your own rule
           </Link>
         </div>
 
-        <div className="mt-7 plate p-4 sm:p-5 flex flex-wrap items-center gap-2 relative">
-          <span className="card-corner tl" />
-          <span className="card-corner tr" />
-          <span className="card-corner bl" />
-          <span className="card-corner br" />
+        <div className="mt-7 plate p-4 sm:p-5 flex flex-wrap items-center gap-2">
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search the index…"
-            className="bg-ink-900/60 border border-parchment/15 rounded-sm px-3 py-2 text-sm font-body w-full sm:w-64 focus:outline-none focus:border-gold/60 text-parchment placeholder:text-parchment-400/60"
+            placeholder="Search the rules…"
+            className="bg-ink-900/60 border border-white/15 rounded-full px-4 py-2 text-sm font-body w-full sm:w-64 focus:outline-none focus:border-gold/60 text-parchment placeholder:text-parchment-400/60"
           />
           <div className="flex gap-1 flex-wrap">
             <FilterPill onClick={() => setTier(null)} active={tier === null}>
@@ -70,7 +66,7 @@ export default function CodexPage() {
                 active={tier === t}
                 tone={`tier-${t}`}
               >
-                <span className="font-display italic mr-1">{TIER_ROMAN[t]}</span>
+                <span className="mr-1 opacity-80">{TIER_ROMAN[t]}</span>
                 {TIER_LABEL[t]}
               </FilterPill>
             ))}
@@ -78,8 +74,8 @@ export default function CodexPage() {
           <button
             onClick={() => setOnlyPlayable((p) => !p)}
             className={
-              "px-3 py-1.5 rounded-sm border text-xs font-display italic " +
-              (onlyPlayable ? "bg-verdigris/20 border-verdigris-glow text-verdigris-glow" : "border-parchment/15 text-parchment-300 hover:border-parchment/30")
+              "px-3 py-1.5 rounded-full border text-xs font-display transition " +
+              (onlyPlayable ? "bg-verdigris/20 border-verdigris text-verdigris-glow" : "border-white/15 text-parchment-300 hover:border-white/30")
             }
           >
             Playable only
@@ -91,8 +87,8 @@ export default function CodexPage() {
             <DrawbackCard key={d.id} drawback={d} ownerLabel={`${TIER_ROMAN[d.tier]} · ${TIER_LABEL[d.tier]}`} />
           ))}
           {filtered.length === 0 && (
-            <div className="text-parchment-300/60 italic font-display">
-              The index has nothing to show under those filters.
+            <div className="text-parchment-300/60 font-display">
+              No rules match those filters.
             </div>
           )}
         </div>
@@ -111,10 +107,10 @@ function FilterPill({
     <button
       onClick={onClick}
       className={
-        "px-3 py-1.5 rounded-sm border text-xs font-display italic transition " +
+        "px-3 py-1.5 rounded-full border text-xs font-display transition " +
         (active
           ? `bg-gold/15 border-gold text-gold-leaf ${tone ?? ""}`
-          : `border-parchment/15 text-parchment-300 hover:border-parchment/30 ${tone ?? ""}`)
+          : `border-white/15 text-parchment-300 hover:border-white/30 ${tone ?? ""}`)
       }
     >
       {children}

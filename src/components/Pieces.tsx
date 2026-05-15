@@ -28,7 +28,7 @@ export function Piece({ type, color, size = 60, className = "" }: Props) {
   );
 }
 
-// Simplified silhouettes — high-contrast white/black with outline for both
+// Simplified silhouettes; high-contrast white/black with outline for both
 // Each entry is innerHTML for the SVG (viewBox 0 0 45 45)
 const fill = (c: Color) => (c === "w" ? "#f5f5f5" : "#1a1a22");
 const stroke = (c: Color) => (c === "w" ? "#1a1a22" : "#f5f5f5");
