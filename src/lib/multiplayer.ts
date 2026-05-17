@@ -37,8 +37,15 @@ export type MPEvent =
   | { type: "disconnected" }
   | { type: "error"; message: string };
 
-export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
-export const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+// Supabase project. The anon key is a public client key (designed to be
+// embedded in browser bundles) so it's fine to commit. Override via env
+// vars if you ever swap projects.
+const DEFAULT_SUPABASE_URL = "https://vahhsjtxhjddohtgqtaj.supabase.co";
+const DEFAULT_SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZhaGhzanR4aGpkZG9odGdxdGFqIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzkwNTg0MzEsImV4cCI6MjA5NDYzNDQzMX0.SDDmEnGyqdeQGE5h25InmW3KtUOjWDmwfjOyis8Lopo";
+
+export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL || DEFAULT_SUPABASE_URL;
+export const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY || DEFAULT_SUPABASE_ANON_KEY;
 export const SUPABASE_CONFIGURED = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
 
 const CHANNEL_PREFIX = "dc-room-";
