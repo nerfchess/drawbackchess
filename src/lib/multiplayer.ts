@@ -27,6 +27,21 @@ export type MPEvent =
 const APP_ID = "drawbackchess-v1";
 const JOIN_TIMEOUT_MS = 25000;
 
+// Well-known, battle-tested public Nostr relays. Trystero's default pool is
+// a grab-bag of obscure relays — many of them are flaky or offline — which
+// caused host and guest to silently end up on different live relays and
+// never discover each other.
+const RELAY_URLS = [
+  "wss://relay.damus.io",
+  "wss://nos.lol",
+  "wss://relay.nostr.band",
+  "wss://relay.snort.social",
+  "wss://relay.primal.net",
+  "wss://nostr.wine",
+  "wss://offchain.pub",
+  "wss://relay.nostr.bg",
+];
+
 function randomCode(): string {
   // Avoid 0/O/1/I/L for readability.
   const chars = "BCDFGHJKMNPQRSTVWXYZ23456789";
@@ -56,7 +71,13 @@ export class MPSession {
 
   private async openRoom(code: string): Promise<void> {
     const { joinRoom } = await import("trystero/nostr");
-    const room = joinRoom({ appId: APP_ID }, code);
+    const room = joinRoom(
+      {
+        appId: APP_ID,
+        relayConfig: { urls: RELAY_URLS, redundancy: RELAY_URLS.length },
+      },
+      code,
+    );
     this.room = room;
     const [sendMsg, getMsg] = room.makeAction("msg");
     this.sendMsg = sendMsg;
