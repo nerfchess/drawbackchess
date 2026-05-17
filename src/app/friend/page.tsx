@@ -16,7 +16,7 @@ import {
 } from "@/engine/game";
 import { makeSeed } from "@/engine/rng";
 import { Color, Move } from "@/engine/types";
-import { MPMessage, MPSession } from "@/lib/multiplayer";
+import { MPMessage, MPSession, SUPABASE_CONFIGURED } from "@/lib/multiplayer";
 import { isMuted, playCapture, playCheck, playMove as playMoveSfx, setMuted } from "@/lib/sounds";
 
 type View = "setup" | "lobby" | "joining" | "game";
@@ -303,6 +303,16 @@ export default function FriendPage() {
             Create a game and share the code, or join one with a code your friend sent you.
             Both players get a random secret rule.
           </p>
+
+          {!SUPABASE_CONFIGURED && (
+            <div className="mt-5 plate p-4 px-5 border-gold/40 bg-gold/10 text-parchment text-sm leading-relaxed">
+              <div className="font-display text-gold-leaf mb-1">Multiplayer needs setup</div>
+              This site is missing its Supabase config, so friend games can&apos;t connect.
+              Create a free project at <span className="font-mono">supabase.com</span>, then set
+              <span className="font-mono"> NEXT_PUBLIC_SUPABASE_URL</span> and
+              <span className="font-mono"> NEXT_PUBLIC_SUPABASE_ANON_KEY</span> in your deployment&apos;s env vars.
+            </div>
+          )}
 
           {error && (
             <div className="mt-5 plate p-3 px-4 border-oxblood-glow/60 bg-oxblood/15 text-parchment">

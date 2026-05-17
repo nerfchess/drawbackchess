@@ -1,16 +1,25 @@
-// Two-player chess matchmaking via ntfy.sh.
+// Two-player chess matchmaking via Supabase Realtime broadcast channels.
 //
-// We've tried WebRTC P2P (PeerJS, Trystero/Nostr) and an MQTT-over-WebSockets
-// broker, and both kept failing because the underlying services were either
-// unreachable from some networks or required heavy client libraries that
-// didn't reliably load in the browser.
+// We tried several "zero config" public services (PeerJS cloud,
+// Trystero/Nostr, public MQTT brokers, ntfy.sh) and they all turned out
+// to be unreliable or have been locked down. Supabase Realtime is free,
+// fast, and reliable — the only setup is creating a project and pasting
+// the URL + anon key into env vars.
 //
-// ntfy.sh is a free public pub/sub service that uses ordinary HTTPS:
-// - publish:   POST https://ntfy.sh/<topic>
-// - subscribe: EventSource on https://ntfy.sh/<topic>/sse
-// Both use browser-native APIs (fetch + EventSource), no external library,
-// no WebRTC, no signaling negotiation. Each game gets its own topic keyed
-// by the 5-letter code; both players publish to and subscribe to it.
+// Channel naming: `dc-room-<code>`. Both players join the same channel,
+// listen for broadcast events, and send their own. A small hello
+// handshake lets the host know when the guest has actually subscribed.
+//
+// Setup (one-time, ~1 minute):
+//   1. Go to https://supabase.com → create a free project
+//   2. In the project's API settings, copy the Project URL and the anon
+//      public key
+//   3. Add to your environment (e.g. .env.local for dev, Vercel env vars
+//      for prod):
+//        NEXT_PUBLIC_SUPABASE_URL=https://xxxxxx.supabase.co
+//        NEXT_PUBLIC_SUPABASE_ANON_KEY=eyJhbGc...
+//   4. No database tables or auth required — Realtime broadcast works
+//      out of the box.
 
 import type { Move } from "@/engine/types";
 
@@ -28,9 +37,12 @@ export type MPEvent =
   | { type: "disconnected" }
   | { type: "error"; message: string };
 
-const BASE = "https://ntfy.sh";
-const TOPIC_PREFIX = "drawbackchess-v1-";
-const SUBSCRIBE_TIMEOUT_MS = 10000;
+export const SUPABASE_URL = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+export const SUPABASE_ANON_KEY = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+export const SUPABASE_CONFIGURED = !!(SUPABASE_URL && SUPABASE_ANON_KEY);
+
+const CHANNEL_PREFIX = "dc-room-";
+const SUBSCRIBE_TIMEOUT_MS = 12000;
 const JOIN_TIMEOUT_MS = 25000;
 
 type Envelope = { from: string; role: "host" | "guest"; payload: MPMessage | { type: "hello" } };
@@ -47,9 +59,18 @@ function randomId(): string {
   return Math.random().toString(36).slice(2, 10) + Date.now().toString(36);
 }
 
+let _client: any | null = null;
+async function getClient(): Promise<any> {
+  if (_client) return _client;
+  const { createClient } = await import("@supabase/supabase-js");
+  _client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    realtime: { params: { eventsPerSecond: 10 } },
+  });
+  return _client;
+}
+
 export class MPSession {
-  private es: EventSource | null = null;
-  private topic = "";
+  private channel: any | null = null;
   private clientId = randomId();
   private listeners: Array<(e: MPEvent) => void> = [];
   private peerSeen = false;
@@ -68,63 +89,48 @@ export class MPSession {
     for (const fn of [...this.listeners]) fn(e);
   }
 
-  private async openTopic(code: string): Promise<void> {
+  private async openChannel(code: string): Promise<void> {
+    if (!SUPABASE_CONFIGURED) {
+      throw new Error(
+        "Multiplayer isn't configured. The site needs NEXT_PUBLIC_SUPABASE_URL and NEXT_PUBLIC_SUPABASE_ANON_KEY env vars.",
+      );
+    }
     this.code = code;
-    this.topic = TOPIC_PREFIX + code;
-    const url = `${BASE}/${this.topic}/sse`;
-    const es = new EventSource(url);
-    this.es = es;
+    const client = await getClient();
+    const channel = client.channel(CHANNEL_PREFIX + code, {
+      config: { broadcast: { self: false, ack: false } },
+    });
+    this.channel = channel;
+
+    channel.on("broadcast", { event: "msg" }, (msg: any) => {
+      const env = msg?.payload as Envelope | undefined;
+      if (!env) return;
+      this.handleEnvelope(env);
+    });
 
     await new Promise<void>((resolve, reject) => {
       let settled = false;
       const timer = setTimeout(() => {
         if (settled) return;
         settled = true;
-        try { es.close(); } catch {}
+        try { channel.unsubscribe(); } catch {}
         reject(new Error("Couldn't reach the matchmaking server. Check your connection and try again."));
       }, SUBSCRIBE_TIMEOUT_MS);
-      es.onopen = () => {
+      channel.subscribe((status: string, err: any) => {
         if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        resolve();
-      };
-      es.onerror = (ev) => {
-        if (settled) return;
-        settled = true;
-        clearTimeout(timer);
-        try { es.close(); } catch {}
-        console.error("[multiplayer] EventSource error:", ev);
-        reject(new Error("Connection to the matchmaking server failed."));
-      };
+        if (status === "SUBSCRIBED") {
+          settled = true;
+          clearTimeout(timer);
+          resolve();
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+          settled = true;
+          clearTimeout(timer);
+          console.error("[multiplayer] channel error:", status, err);
+          reject(new Error("Couldn't reach the matchmaking server."));
+        }
+      });
     });
 
-    es.onmessage = (ev: MessageEvent) => {
-      let outer: any;
-      try {
-        outer = JSON.parse(ev.data);
-      } catch {
-        return;
-      }
-      // ntfy wraps published bodies inside an `event: message` JSON with a
-      // `message` field that contains our payload as a string.
-      if (outer.event !== "message" || typeof outer.message !== "string") return;
-      let env: Envelope;
-      try {
-        env = JSON.parse(outer.message);
-      } catch {
-        return;
-      }
-      this.handleEnvelope(env);
-    };
-    es.onerror = () => {
-      // EventSource auto-reconnects on transient errors; we only treat it as
-      // disconnect once we've actually seen the peer to avoid early noise.
-      if (this.peerSeen) console.warn("[multiplayer] SSE stream blip; reconnecting…");
-    };
-
-    // Announce presence so the other side detects us. Repeat a few times in
-    // case our publish lands before the other side has subscribed.
     await this.publish({ type: "hello" } as any);
     this.helloInterval = setInterval(() => {
       if (this.peerSeen) {
@@ -132,14 +138,14 @@ export class MPSession {
         this.helloInterval = null;
         return;
       }
-      this.publish({ type: "hello" } as any).catch(() => {});
+      this.publish({ type: "hello" } as any);
     }, 1500);
   }
 
   private handleEnvelope(env: Envelope) {
     if (env.from === this.clientId) return;
     const myRole = this.isHost ? "host" : "guest";
-    if (env.role === myRole) return; // ignore peers in the same role
+    if (env.role === myRole) return;
     const firstSighting = !this.peerSeen;
     if (firstSighting) {
       this.peerSeen = true;
@@ -151,25 +157,22 @@ export class MPSession {
     }
     const payload = env.payload as any;
     if (payload?.type === "hello") {
-      // Reply with our own hello so the other side learns about us if it
-      // came online after our initial hello bursts.
-      if (firstSighting) this.publish({ type: "hello" } as any).catch(() => {});
+      // Reply so the peer that just came online learns about us.
+      if (firstSighting) this.publish({ type: "hello" } as any);
       return;
     }
     this.emit({ type: "message", message: payload as MPMessage });
   }
 
-  private async publish(payload: MPMessage | { type: "hello" }): Promise<void> {
+  private async publish(payload: MPMessage | { type: "hello" }) {
+    if (!this.channel) return;
     const env: Envelope = {
       from: this.clientId,
       role: this.isHost ? "host" : "guest",
       payload,
     };
     try {
-      await fetch(`${BASE}/${this.topic}`, {
-        method: "POST",
-        body: JSON.stringify(env),
-      });
+      await this.channel.send({ type: "broadcast", event: "msg", payload: env });
     } catch (e) {
       console.error("[multiplayer] publish error:", e);
     }
@@ -179,7 +182,7 @@ export class MPSession {
     this.isHost = true;
     const code = randomCode();
     try {
-      await this.openTopic(code);
+      await this.openChannel(code);
       this.emit({ type: "open", code });
       return code;
     } catch (e: any) {
@@ -193,7 +196,7 @@ export class MPSession {
   async join(code: string): Promise<void> {
     this.isHost = false;
     try {
-      await this.openTopic(code);
+      await this.openChannel(code);
     } catch (e: any) {
       const msg = String(e?.message || e) || "Could not join game.";
       console.error("[multiplayer] join error:", e);
@@ -226,7 +229,7 @@ export class MPSession {
   }
 
   send(message: MPMessage) {
-    this.publish(message).catch(() => {});
+    this.publish(message);
   }
 
   destroy() {
@@ -234,8 +237,8 @@ export class MPSession {
       clearInterval(this.helloInterval);
       this.helloInterval = null;
     }
-    try { this.es?.close(); } catch {}
-    this.es = null;
+    try { this.channel?.unsubscribe(); } catch {}
+    this.channel = null;
     this.peerSeen = false;
     this.listeners = [];
   }
