@@ -123,6 +123,10 @@ export default function FriendPage() {
 
   const handleCreate = async () => {
     setError(null);
+    setCode("");
+    // Switch to the lobby immediately so the user sees something happening
+    // while PeerJS negotiates with the signaling server.
+    setView("lobby");
     const sess = new MPSession();
     sessionRef.current = sess;
     // Pre-generate game setup so it's ready when the guest joins.
@@ -137,9 +141,9 @@ export default function FriendPage() {
     try {
       const c = await sess.host();
       setCode(c);
-      setView("lobby");
     } catch (e: any) {
-      setError(String(e?.message || e));
+      setError(String(e?.message || e) || "Could not create a game.");
+      setView("setup");
     }
   };
 
@@ -341,14 +345,20 @@ export default function FriendPage() {
       <main className="min-h-screen">
         <SiteNav />
         <section className="max-w-xl mx-auto px-6 py-12 text-center">
-          <div className="smallcaps text-[11px] text-parchment-400">Share this code</div>
-          <div className="mt-3 font-mono text-5xl tracking-[0.2em] text-gold-leaf">{code}</div>
+          <div className="smallcaps text-[11px] text-parchment-400">
+            {code ? "Share this code" : "Generating code…"}
+          </div>
+          <div className="mt-3 font-mono text-5xl tracking-[0.2em] text-gold-leaf min-h-[1.2em]">
+            {code || "·····"}
+          </div>
           <p className="mt-6 text-parchment-200">
-            Send the code to your friend. They open this page and tap “Join”.
+            {code
+              ? "Send the code to your friend. They open this page and tap “Join”."
+              : "Setting up a private room. This usually takes a couple of seconds."}
           </p>
           <div className="mt-8 flex items-center justify-center gap-2 smallcaps text-[11px] text-parchment-400">
             <span className="w-1.5 h-1.5 rounded-full bg-verdigris animate-flicker" />
-            Waiting for opponent…
+            {code ? "Waiting for opponent…" : "Connecting to matchmaker…"}
           </div>
           {error && (
             <div className="mt-6 plate p-3 px-4 border-oxblood-glow/60 bg-oxblood/15 text-parchment">

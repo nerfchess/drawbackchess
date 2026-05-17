@@ -59,9 +59,21 @@ export class MPSession {
           let settled = false;
           const peer = new Peer(ID_PREFIX + code, { debug: 1 });
           this.peer = peer;
+          // Safety timeout — if the signaling server never responds, fail fast
+          // so the UI can show an error instead of hanging silently.
+          const timeout = setTimeout(() => {
+            if (settled) return;
+            settled = true;
+            const msg = "Couldn't reach the matchmaking server. Check your connection and try again.";
+            console.error("[multiplayer] host open timeout for code:", code);
+            this.emit({ type: "error", message: msg });
+            try { peer.destroy(); } catch {}
+            reject(new Error(msg));
+          }, 8000);
           peer.on("open", () => {
             if (settled) return;
             settled = true;
+            clearTimeout(timeout);
             this.code = code;
             this.emit({ type: "open", code });
             resolve();
@@ -72,6 +84,7 @@ export class MPSession {
             this.emit({ type: "error", message: msg });
             if (!settled) {
               settled = true;
+              clearTimeout(timeout);
               reject(e);
             }
           });
