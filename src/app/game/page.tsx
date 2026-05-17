@@ -27,6 +27,18 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 
+function formatClock(ms: number): string {
+  const clamped = Math.max(0, ms);
+  // Under 10s, show 1 decimal so the user can feel the rush.
+  if (clamped < 10000) {
+    return `0:0${(clamped / 1000).toFixed(1)}`;
+  }
+  const totalSec = Math.ceil(clamped / 1000);
+  const m = Math.floor(totalSec / 60);
+  const s = totalSec % 60;
+  return `${m}:${s.toString().padStart(2, "0")}`;
+}
+
 function pickRandomDrawback(): Drawback {
   const playable = PLAYABLE_DRAWBACKS.filter((d) => d.id !== "lucky");
   return playable[Math.floor(Math.random() * playable.length)];
@@ -86,6 +98,12 @@ function GamePage() {
   const difficulty = (params.get("difficulty") ?? "medium") as AILevel;
   const myColorParam = params.get("color") ?? "random";
   const myDrawbackId = params.get("drawback") ?? "random";
+  // t = seconds per side; 0 (or missing) disables the clock entirely.
+  const initialTimeMs = useMemo(() => {
+    const t = parseInt(params.get("t") ?? "0", 10);
+    return Number.isFinite(t) && t > 0 ? t * 1000 : 0;
+  }, [params]);
+  const clockEnabled = initialTimeMs > 0;
 
   const myColor: Color = useMemo(() => {
     if (myColorParam === "w") return "w";
@@ -99,6 +117,8 @@ function GamePage() {
   const [premoves, setPremoves] = useState<QueuedPremove[]>([]);
   const [confirmingResign, setConfirmingResign] = useState(false);
   const [drawOfferStatus, setDrawOfferStatus] = useState<"idle" | "offering" | "declined">("idle");
+  const [whiteMs, setWhiteMs] = useState(initialTimeMs);
+  const [blackMs, setBlackMs] = useState(initialTimeMs);
   const aiThinking = useRef(false);
 
   useEffect(() => {
@@ -250,6 +270,31 @@ function GamePage() {
     }, 90);
     return () => clearTimeout(tid);
   }, [game, premoves, moves, myColor]);
+
+  // Clock tick — decrement the active side's clock at 100ms intervals while the
+  // game is live. The actual loss check is in a separate effect so we don't
+  // schedule state updates inside the tick callback.
+  useEffect(() => {
+    if (!clockEnabled || !game || game.result) return;
+    const id = setInterval(() => {
+      const dec = (t: number) => Math.max(0, t - 100);
+      if (game.board.turn === "w") setWhiteMs(dec);
+      else setBlackMs(dec);
+    }, 100);
+    return () => clearInterval(id);
+  }, [game, clockEnabled]);
+
+  // Timeout: when a clock hits 0, the side whose clock ran out loses.
+  useEffect(() => {
+    if (!clockEnabled || !game || game.result) return;
+    if (whiteMs <= 0) {
+      game.result = { winner: "b", reason: "white ran out of time" };
+      setGame({ ...game });
+    } else if (blackMs <= 0) {
+      game.result = { winner: "w", reason: "black ran out of time" };
+      setGame({ ...game });
+    }
+  }, [whiteMs, blackMs, clockEnabled, game]);
 
   // AI move
   useEffect(() => {
@@ -469,6 +514,20 @@ function GamePage() {
           />
         </div>
         <aside className="space-y-4">
+          {clockEnabled && (
+            <div className="grid grid-cols-2 gap-2">
+              <ClockPill
+                label="Opponent"
+                ms={myColor === "w" ? blackMs : whiteMs}
+                active={!game.result && game.board.turn !== myColor}
+              />
+              <ClockPill
+                label="You"
+                ms={myColor === "w" ? whiteMs : blackMs}
+                active={!game.result && game.board.turn === myColor}
+              />
+            </div>
+          )}
           <DrawbackCard drawback={myDrawback} />
           <DrawbackCard drawback={opponentDrawback} revealed={!!game.result} />
           <MoveList moves={game.board.history} />
@@ -485,5 +544,34 @@ function GamePage() {
         />
       )}
     </main>
+  );
+}
+
+function ClockPill({ label, ms, active }: { label: string; ms: number; active: boolean }) {
+  const low = ms < 30000;
+  const critical = ms < 10000;
+  return (
+    <div
+      className={
+        "plate p-3 flex items-center justify-between gap-3 transition " +
+        (active
+          ? "border-gold/70 bg-gold/10 shadow-leaf"
+          : "opacity-70")
+      }
+    >
+      <span className="smallcaps text-[10px] text-parchment-400">{label}</span>
+      <span
+        className={
+          "font-mono text-xl tabular-nums font-semibold " +
+          (critical
+            ? "text-oxblood-glow"
+            : low
+            ? "text-gold-leaf"
+            : "text-parchment")
+        }
+      >
+        {formatClock(ms)}
+      </span>
+    </div>
   );
 }

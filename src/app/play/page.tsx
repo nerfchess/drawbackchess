@@ -10,6 +10,8 @@ export default function PlayPage() {
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [color, setColor] = useState<"w" | "b" | "random">("random");
   const [drawbackId, setDrawbackId] = useState<string>("random");
+  // Time control in seconds per side; 0 = unlimited (no clock)
+  const [timeSec, setTimeSec] = useState<number>(600);
 
   const start = () => {
     const params = new URLSearchParams({
@@ -17,6 +19,7 @@ export default function PlayPage() {
       difficulty,
       color,
       drawback: drawbackId,
+      t: String(timeSec),
     });
     router.push(`/game?${params.toString()}`);
   };
@@ -49,6 +52,20 @@ export default function PlayPage() {
             <Pill selected={color === "w"} onClick={() => setColor("w")}>White</Pill>
             <Pill selected={color === "random"} onClick={() => setColor("random")}>Random</Pill>
             <Pill selected={color === "b"} onClick={() => setColor("b")}>Black</Pill>
+          </Group>
+
+          <Group label="Time per side">
+            {([
+              { s: 0, l: "Unlimited" },
+              { s: 180, l: "3 min" },
+              { s: 300, l: "5 min" },
+              { s: 600, l: "10 min" },
+              { s: 1800, l: "30 min" },
+            ] as const).map(({ s, l }) => (
+              <Pill key={s} selected={timeSec === s} onClick={() => setTimeSec(s)}>
+                {l}
+              </Pill>
+            ))}
           </Group>
 
           <Group label="Your secret rule">

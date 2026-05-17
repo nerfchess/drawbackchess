@@ -13,7 +13,10 @@ const SHEETS: Record<string, string> = {
   // We use Cburnett SVGs encoded inline as React components below
 };
 
-export function Piece({ type, color, size = 60, className = "" }: Props) {
+// Memoized so identical (type, color, size, className) props skip re-rendering.
+// Without this, every premove update reflows every piece's SVG via
+// dangerouslySetInnerHTML and the textures visibly flicker.
+export const Piece = React.memo(function Piece({ type, color, size = 60, className = "" }: Props) {
   const key = `${color}${type}`;
   const path = PATHS[key];
   return (
@@ -26,7 +29,7 @@ export function Piece({ type, color, size = 60, className = "" }: Props) {
       dangerouslySetInnerHTML={{ __html: path }}
     />
   );
-}
+});
 
 // Simplified silhouettes; high-contrast white/black with outline for both
 // Each entry is innerHTML for the SVG (viewBox 0 0 45 45)
