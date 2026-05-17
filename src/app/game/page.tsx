@@ -44,11 +44,13 @@ function pickRandomDrawback(): Drawback {
   return playable[Math.floor(Math.random() * playable.length)];
 }
 
-// Pseudo-legal premove options on a (turn-flipped) board. Only moves to empty
-// squares or enemy squares are queueable; you can't premove a capture of your
-// own piece. The active drawback's filterMoves is also applied (best-effort
-// against the current drawback state) so you can't queue drawback-illegal
-// moves.
+// Pseudo-legal premove options on a (turn-flipped) board. The active drawback's
+// filterMoves is applied to the base move list so drawback-illegal premoves
+// aren't queueable. On top of that we synthesize "friendly-target" moves —
+// moves that would land on one of our own non-king pieces — so the user can
+// premove anticipating an opponent capture. These synthetics aren't passed
+// through the drawback filter at queue-time; the real legal-move list at
+// execute-time decides whether they actually play.
 function premoveOptionsFor(
   board: BoardState,
   me: Color,
@@ -57,14 +59,27 @@ function premoveOptionsFor(
   ctx: GameContext | null,
 ): Move[] {
   const base = generateMoves(board);
+  let filtered: Move[] = base;
   if (drawback?.filterMoves && drawbackState && ctx) {
     try {
-      return drawback.filterMoves(base, drawbackState, ctx);
+      filtered = drawback.filterMoves(base, drawbackState, ctx);
     } catch {
-      return base;
+      filtered = base;
     }
   }
-  return base;
+  const extras: Move[] = [];
+  for (let sq = 0; sq < 64; sq++) {
+    const p = board.pieces[sq];
+    if (!p || p.color !== me || p.type === "k") continue;
+    const tmp = cloneBoard(board);
+    tmp.pieces[sq] = null;
+    const all = generateMoves(tmp);
+    for (const m of all) {
+      if (m.to !== sq) continue;
+      extras.push({ ...m, captured: p.type });
+    }
+  }
+  return [...filtered, ...extras];
 }
 
 export default function GamePageWrapper() {
@@ -185,7 +200,8 @@ function GamePage() {
         (c) =>
           c.from === pm.from &&
           c.to === pm.to &&
-          (c.promotion ?? undefined) === (pm.promotion ?? undefined),
+          (c.promotion ?? undefined) === (pm.promotion ?? undefined) &&
+          (!pm.capture || !!c.captured),
       );
       if (!match) break;
       board = makeMove(board, match);
@@ -257,7 +273,13 @@ function GamePage() {
       (lm) =>
         lm.from === head.from &&
         lm.to === head.to &&
-        (lm.promotion ?? undefined) === (head.promotion ?? undefined),
+        (lm.promotion ?? undefined) === (head.promotion ?? undefined) &&
+        // If the user premoved a capture (real or friendly-target), the
+        // matching legal move must also be a capture — otherwise a planned
+        // Nxe5 silently downgrades to a quiet Ne5 when the target ran away,
+        // and a friendly-target premove fires only when the opponent
+        // actually took our piece.
+        (!head.capture || !!lm.captured),
     );
     if (!m) {
       setPremoves([]);
