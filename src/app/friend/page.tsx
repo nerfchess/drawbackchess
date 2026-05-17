@@ -51,6 +51,7 @@ export default function FriendPage() {
 
   const sessionRef = useRef<MPSession | null>(null);
   const clockEnabledRef = useRef(false);
+  const initHandledRef = useRef(false);
 
   useEffect(() => setMutedState(isMuted()), []);
 
@@ -86,11 +87,28 @@ export default function FriendPage() {
       } else if (e.type === "disconnected") {
         setError("Opponent disconnected.");
       } else if (e.type === "guest-connected" && role === "host") {
-        // Host generates the entire game setup and sends it.
+        // Host generates the entire game setup and sends it. We blast init
+        // a few times because the data channel can briefly drop messages
+        // right after onPeerJoin fires; the guest dedupes by checking if
+        // game state already exists.
         const initMsg = payload as Extract<MPMessage, { type: "init" }>;
-        sess.send(initMsg);
+        const blast = (n: number) => {
+          sess.send(initMsg);
+          if (n > 0) setTimeout(() => blast(n - 1), 500);
+        };
+        blast(4);
         startGameFromInit(initMsg, "w");
+      } else if (e.type === "host-ready" && role === "guest") {
+        // Guest pings the host as soon as it sees them; the host re-sends
+        // init in response, in case the host's first burst didn't land.
+        sess.send({ type: "ping" });
+      } else if (e.type === "message" && role === "host" && e.message.type === "ping") {
+        // Guest is asking for init — re-send.
+        if (payload) sess.send(payload as Extract<MPMessage, { type: "init" }>);
       } else if (e.type === "message" && role === "guest" && e.message.type === "init") {
+        // Host re-sends init a few times for reliability; only act on the first.
+        if (initHandledRef.current) return;
+        initHandledRef.current = true;
         startGameFromInit(e.message, "b");
       } else if (e.type === "message" && e.message.type === "move") {
         // Opponent's move — apply locally
@@ -250,6 +268,7 @@ export default function FriendPage() {
   const handleRematch = () => {
     sessionRef.current?.destroy();
     sessionRef.current = null;
+    initHandledRef.current = false;
     setGame(null);
     setPremoves([]);
     setView("setup");
