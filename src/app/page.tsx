@@ -12,16 +12,16 @@ export default function HomePage() {
 
       <section className="max-w-6xl mx-auto px-6 pt-10 pb-16 sm:pt-16 sm:pb-24 grid lg:grid-cols-[1.1fr_1fr] gap-14 items-center">
         <div className="animate-rise">
-          <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full border border-verdigris/40 bg-verdigris/10">
-            <span className="w-1.5 h-1.5 rounded-full bg-verdigris animate-flicker" />
-            <span className="smallcaps text-[10px] text-verdigris-glow">
+          <div className="inline-flex items-center gap-2.5 px-3 py-1 border-y border-gold/30">
+            <span className="w-1 h-1 rounded-full bg-gold-leaf animate-flicker" />
+            <span className="smallcaps text-[10px] text-gold-leaf">
               150+ secret rules
             </span>
           </div>
 
-          <h1 className="mt-6 font-display text-5xl sm:text-7xl leading-[1.05] tracking-tight">
+          <h1 className="mt-7 font-display font-normal text-5xl sm:text-7xl leading-[1.02] tracking-[-0.02em]">
             <span className="block text-parchment">Chess,</span>
-            <span className="block text-gold-leaf">with secrets.</span>
+            <span className="block italic text-gold-leaf">with secrets.</span>
           </h1>
 
           <p className="mt-6 max-w-xl text-lg leading-relaxed text-parchment-200">
@@ -29,24 +29,24 @@ export default function HomePage() {
             So does your opponent. Win the game, and figure out their rule before they figure out yours.
           </p>
 
-          <div className="mt-8 flex flex-wrap items-center gap-3">
-            <Link href="/play" className="px-7 py-3 rounded-full btn-leaf font-display text-base">
+          <div className="mt-9 flex flex-wrap items-center gap-3">
+            <Link href="/play" className="px-7 py-3 rounded-sm btn-leaf font-body text-base">
               Play now
             </Link>
-            <Link href="/codex" className="px-7 py-3 rounded-full btn-ghost font-display">
+            <Link href="/codex" className="px-7 py-3 rounded-sm btn-ghost font-body">
               Browse the rules
             </Link>
           </div>
 
-          <ul className="mt-8 grid grid-cols-1 sm:grid-cols-3 gap-2 text-sm text-parchment-200">
-            <li className="flex items-baseline gap-2"><span className="text-gold">★</span> No checkmate</li>
-            <li className="flex items-baseline gap-2"><span className="text-gold">★</span> Capture the king</li>
-            <li className="flex items-baseline gap-2"><span className="text-gold">★</span> Sneaky king-en-passant</li>
+          <ul className="mt-10 grid grid-cols-1 sm:grid-cols-3 gap-x-6 gap-y-2 text-sm text-parchment-200/90 border-t border-parchment/10 pt-5">
+            <li className="flex items-baseline gap-2"><span className="font-display italic text-gold-leaf text-xs">i.</span> No checkmate</li>
+            <li className="flex items-baseline gap-2"><span className="font-display italic text-gold-leaf text-xs">ii.</span> Capture the king</li>
+            <li className="flex items-baseline gap-2"><span className="font-display italic text-gold-leaf text-xs">iii.</span> King en passant</li>
           </ul>
         </div>
 
         <div className="relative h-[440px] sm:h-[520px] overflow-hidden lg:overflow-visible">
-          <div className="absolute -inset-12 sigil opacity-30 animate-sigil pointer-events-none" />
+          <div className="absolute -inset-16 sigil opacity-90 pointer-events-none" />
           <FloatCard className="absolute top-0 left-2 sm:left-8 -rotate-6">
             <DrawbackCard drawback={FOG_OF_WAR} />
           </FloatCard>
@@ -62,35 +62,32 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="max-w-6xl mx-auto px-6 py-16">
-        <div className="rule-ornament text-[11px] text-parchment-400 mb-10">
-          <span className="font-display">three things to know</span>
+      <section className="max-w-6xl mx-auto px-6 py-20">
+        <div className="rule-ornament mb-12">
+          <span>Three things to know</span>
         </div>
-        <div className="grid sm:grid-cols-3 gap-5">
+        <div className="grid sm:grid-cols-3 gap-6">
           {[
             {
-              n: "1",
+              n: "I",
               t: "Hidden information",
               d: "You see your rule. They see theirs. A misread is punished. A bluff is rewarded.",
-              c: "text-verdigris-glow",
             },
             {
-              n: "2",
+              n: "II",
               t: "Modified rules",
               d: "Forget checkmate. The king is just another piece you can capture. Castle through check. King en passant exists.",
-              c: "text-gold-leaf",
             },
             {
-              n: "3",
+              n: "III",
               t: "150+ rules",
               d: "From “you can't move to the h-file” to “if any enemy pawn touches your half, you lose.”",
-              c: "text-bruise-glow",
             },
           ].map((f) => (
-            <article key={f.t} className="plate p-6 relative overflow-hidden">
-              <div className={`font-display text-5xl leading-none ${f.c}`}>{f.n}</div>
-              <div className="mt-3 font-display text-2xl text-parchment">{f.t}</div>
-              <p className="mt-2 text-sm leading-relaxed text-parchment-200">{f.d}</p>
+            <article key={f.t} className="plate p-7 relative overflow-hidden">
+              <div className="font-display italic text-gold-leaf text-4xl leading-none tracking-tight">{f.n}</div>
+              <div className="mt-5 font-display text-2xl text-parchment leading-tight">{f.t}</div>
+              <p className="mt-3 text-[14px] leading-relaxed text-parchment-200/90">{f.d}</p>
             </article>
           ))}
         </div>

@@ -5,59 +5,59 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        display: ["var(--font-display)", "system-ui", "sans-serif"],
+        display: ["var(--font-display)", "ui-serif", "Georgia", "serif"],
         body: ["var(--font-body)", "system-ui", "sans-serif"],
         mono: ["var(--font-mono)", "ui-monospace", "monospace"],
       },
       colors: {
-        // ink = soft dark blues (background tones)
+        // ink = deep cool navy (background tones)
         ink: {
-          950: "#0e1726",
-          900: "#162236",
-          800: "#1f2e47",
-          700: "#2a3c5b",
-          600: "#3a4e72",
-          500: "#516a92",
-          400: "#7a8eb3",
+          950: "#0a111e",
+          900: "#111a2b",
+          800: "#1a253b",
+          700: "#26334d",
+          600: "#384664",
+          500: "#566687",
+          400: "#7d8cab",
         },
-        // parchment = bright cream / off-white (foreground text)
+        // parchment = warm off-white (foreground text)
         parchment: {
-          DEFAULT: "#f7f4ea",
-          50: "#fbf9f3",
-          100: "#f7f4ea",
-          200: "#eee8d8",
-          300: "#dfd6bf",
-          400: "#b8b09a",
-          500: "#8c8676",
+          DEFAULT: "#ece7d6",
+          50: "#f4f0e3",
+          100: "#ece7d6",
+          200: "#ddd5bf",
+          300: "#bdb39a",
+          400: "#8e8775",
+          500: "#5f5b50",
         },
-        // gold = playful yellow/amber (primary accent)
+        // gold = aged brass (primary accent)
         gold: {
-          DEFAULT: "#ffc857",
-          leaf: "#ffd97a",
-          dim: "#e0a93e",
+          DEFAULT: "#c89b4a",
+          leaf: "#d8b56e",
+          dim: "#9a7634",
         },
-        // oxblood = warm coral pink (alert / danger)
+        // oxblood = deep brick (alert / danger)
         oxblood: {
-          DEFAULT: "#ff6b6b",
-          glow: "#ff8a8a",
-          deep: "#e04545",
+          DEFAULT: "#b54641",
+          glow: "#c66860",
+          deep: "#7e2c28",
         },
-        // verdigris = mint teal (success / cool accent)
+        // verdigris = aged copper green (cool accent)
         verdigris: {
-          DEFAULT: "#3ed598",
-          glow: "#6aebb6",
+          DEFAULT: "#5a9b7a",
+          glow: "#7eb59a",
         },
-        // bruise = lavender (secondary accent)
+        // bruise = dusty slate violet (secondary accent)
         bruise: {
-          DEFAULT: "#a78bfa",
-          glow: "#c4b5fd",
+          DEFAULT: "#7c7aa3",
+          glow: "#9d9bc0",
         },
       },
       boxShadow: {
-        leaf: "0 0 24px -6px rgba(255,200,87,0.45)",
-        oxblood: "0 0 32px -10px rgba(255,107,107,0.45)",
+        leaf: "0 0 24px -10px rgba(216,181,110,0.35)",
+        oxblood: "0 0 32px -14px rgba(181,70,65,0.4)",
         plate:
-          "0 12px 40px -16px rgba(0,0,0,0.45), 0 1px 0 0 rgba(255,255,255,0.06) inset",
+          "0 14px 50px -22px rgba(0,0,0,0.55), 0 1px 0 0 rgba(255,255,255,0.04) inset",
       },
       keyframes: {
         flicker: {
@@ -84,8 +84,8 @@ export default {
       },
       animation: {
         flicker: "flicker 4.5s ease-in-out infinite",
-        sigil: "sigil 30s linear infinite",
-        rise: "rise 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both",
+        sigil: "sigil 60s linear infinite",
+        rise: "rise 0.6s cubic-bezier(0.2, 0.8, 0.2, 1) both",
         seal: "seal 0.5s cubic-bezier(0.2, 1.4, 0.4, 1) both",
         bob: "bob 4s ease-in-out infinite",
       },

@@ -1,18 +1,19 @@
 import type { Metadata } from "next";
-import { Fredoka, Nunito, JetBrains_Mono } from "next/font/google";
+import { Fraunces, Inter_Tight, JetBrains_Mono } from "next/font/google";
 import { Analytics } from "@vercel/analytics/react";
 import "./globals.css";
 
-const display = Fredoka({
+const display = Fraunces({
   subsets: ["latin"],
   weight: ["400", "500", "600", "700"],
+  style: ["normal", "italic"],
   variable: "--font-display",
   display: "swap",
 });
 
-const body = Nunito({
+const body = Inter_Tight({
   subsets: ["latin"],
-  weight: ["400", "500", "600", "700"],
+  weight: ["400", "500", "600"],
   variable: "--font-body",
   display: "swap",
 });

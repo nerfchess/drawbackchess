@@ -3,166 +3,189 @@
 @tailwind utilities;
 
 :root {
-  --paper: #f7f4ea;
-  --paper-dim: #b8b09a;
-  --ink-deep: #0e1726;
-  --ink-warm: #162236;
-  --gold: #ffc857;
-  --gold-leaf: #ffd97a;
-  --oxblood: #ff6b6b;
-  --verdigris: #3ed598;
-  --bruise: #a78bfa;
+  --paper: #ece7d6;
+  --paper-dim: #8e8775;
+  --ink-deep: #0a111e;
+  --ink-warm: #111a2b;
+  --gold: #c89b4a;
+  --gold-leaf: #d8b56e;
+  --oxblood: #b54641;
+  --verdigris: #5a9b7a;
+  --bruise: #7c7aa3;
 }
 
 html, body {
   background:
-    radial-gradient(ellipse 90% 60% at 50% -10%, rgba(255,200,87,0.10), transparent 70%),
-    radial-gradient(ellipse 60% 80% at 100% 100%, rgba(167,139,250,0.10), transparent 70%),
-    radial-gradient(ellipse 60% 80% at 0% 100%, rgba(62,213,152,0.08), transparent 70%),
-    linear-gradient(180deg, #162236 0%, #0e1726 100%);
+    radial-gradient(ellipse 120% 70% at 50% -20%, rgba(200,155,74,0.07), transparent 60%),
+    radial-gradient(ellipse 80% 50% at 100% 110%, rgba(124,122,163,0.05), transparent 70%),
+    linear-gradient(180deg, #111a2b 0%, #0a111e 100%);
+  background-attachment: fixed;
   color: var(--paper);
   min-height: 100vh;
 }
 
 body {
   font-family: var(--font-body), system-ui, sans-serif;
+  font-weight: 400;
   -webkit-font-smoothing: antialiased;
   text-rendering: optimizeLegibility;
 }
 
 /* --- Type rhythm --- */
-.font-display { font-family: var(--font-display), system-ui, sans-serif; font-weight: 600; letter-spacing: -0.01em; }
+.font-display {
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+  font-weight: 500;
+  letter-spacing: -0.015em;
+  font-feature-settings: "ss01", "ss02";
+}
 .font-body    { font-family: var(--font-body), system-ui, sans-serif; }
 .font-mono    { font-family: var(--font-mono), ui-monospace, monospace; }
 
 .smallcaps {
-  letter-spacing: 0.16em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
-  font-weight: 600;
+  font-weight: 500;
+  font-family: var(--font-body), system-ui, sans-serif;
 }
 .allcaps {
-  letter-spacing: 0.18em;
+  letter-spacing: 0.22em;
   text-transform: uppercase;
 }
 .dropcap::first-letter {
-  font-family: var(--font-display), system-ui, sans-serif;
-  font-weight: 700;
+  font-family: var(--font-display), ui-serif, Georgia, serif;
+  font-weight: 600;
+  font-style: italic;
   float: left;
-  font-size: 3.2em;
-  line-height: 0.9;
-  padding: 0.05em 0.12em 0 0;
+  font-size: 3.4em;
+  line-height: 0.88;
+  padding: 0.05em 0.14em 0 0;
   color: var(--gold-leaf);
 }
 
-/* Make occult-era italics render as normal weight (Fredoka has no italic).
-   Pages set lots of italic={true} that read badly here; normalize. */
-.font-display.italic, em.font-display, i.font-display { font-style: normal; }
+/* Fraunces has real italics; let them render. Drop the old override. */
 
-/* --- Ornament rules → simple dividers --- */
+/* --- Ornament rules → hairline dividers --- */
 .rule-ornament {
   display: flex;
   align-items: center;
-  gap: 0.9rem;
+  gap: 1.1rem;
   color: var(--paper-dim);
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  font-size: 10px;
+  font-weight: 500;
+  font-family: var(--font-body), system-ui, sans-serif;
 }
 .rule-ornament::before,
 .rule-ornament::after {
   content: "";
   flex: 1;
   height: 1px;
-  background: linear-gradient(90deg, transparent, currentColor, transparent);
-  opacity: 0.35;
+  background: currentColor;
+  opacity: 0.18;
+}
+.rule-ornament .font-display {
+  font-family: var(--font-body), system-ui, sans-serif;
+  letter-spacing: 0.22em;
+  font-weight: 500;
 }
 
-/* --- Card --- */
+/* --- Card / plate --- */
 .plate {
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.04), rgba(255,255,255,0.02)),
-    rgba(22, 34, 54, 0.6);
-  border: 1px solid rgba(255,255,255,0.08);
+    linear-gradient(180deg, rgba(255,253,245,0.025), rgba(255,253,245,0.008)),
+    rgba(17, 26, 43, 0.72);
+  border: 1px solid rgba(236,231,214,0.08);
   box-shadow:
-    0 12px 40px -16px rgba(0,0,0,0.45),
-    0 1px 0 0 rgba(255,255,255,0.06) inset;
-  backdrop-filter: blur(6px);
-  border-radius: 1rem;
+    0 14px 50px -22px rgba(0,0,0,0.55),
+    0 1px 0 0 rgba(255,253,245,0.04) inset;
+  backdrop-filter: blur(8px);
+  border-radius: 6px;
   position: relative;
   z-index: 2;
 }
 .plate-warm {
   background:
-    linear-gradient(180deg, rgba(255,255,255,0.05), rgba(255,255,255,0.02)),
-    rgba(31, 46, 71, 0.7);
+    linear-gradient(180deg, rgba(255,253,245,0.035), rgba(255,253,245,0.012)),
+    rgba(26, 37, 59, 0.78);
 }
 
-/* Hairline accent edge */
+/* Hairline brass edge */
 .gilt {
   box-shadow:
-    0 0 0 1px rgba(255,200,87,0.45),
-    0 12px 40px -16px rgba(0,0,0,0.5),
-    0 1px 0 0 rgba(255,255,255,0.08) inset;
+    0 0 0 1px rgba(200,155,74,0.4),
+    0 14px 50px -22px rgba(0,0,0,0.6),
+    0 1px 0 0 rgba(255,253,245,0.06) inset;
 }
 
-/* --- Tier palette: kid friendly, WCAG AA on dark cards --- */
-.tier-1 { color: #6aebb6; }   /* mint */
-.tier-2 { color: #7fc8ff; }   /* sky */
-.tier-3 { color: #ffd97a; }   /* sunshine */
-.tier-4 { color: #ffae6e; }   /* tangerine */
-.tier-5 { color: #ff8a8a; }   /* coral */
+/* --- Tier palette: muted editorial, brass→brick gradient by severity --- */
+.tier-1 { color: #7eb59a; }   /* sage */
+.tier-2 { color: #8ba9c4; }   /* slate */
+.tier-3 { color: #d8b56e; }   /* brass */
+.tier-4 { color: #c79468; }   /* clay */
+.tier-5 { color: #c66860; }   /* brick */
 
-.tier-bg-1 { background: rgba(62,213,152,0.12); border-color: rgba(62,213,152,0.45); }
-.tier-bg-2 { background: rgba(127,200,255,0.12); border-color: rgba(127,200,255,0.45); }
-.tier-bg-3 { background: rgba(255,217,122,0.12); border-color: rgba(255,217,122,0.55); }
-.tier-bg-4 { background: rgba(255,174,110,0.12); border-color: rgba(255,174,110,0.5); }
-.tier-bg-5 { background: rgba(255,138,138,0.14); border-color: rgba(255,138,138,0.55); }
+.tier-bg-1 { background: rgba(126,181,154,0.10); border-color: rgba(126,181,154,0.35); }
+.tier-bg-2 { background: rgba(139,169,196,0.10); border-color: rgba(139,169,196,0.35); }
+.tier-bg-3 { background: rgba(216,181,110,0.10); border-color: rgba(216,181,110,0.45); }
+.tier-bg-4 { background: rgba(199,148,104,0.10); border-color: rgba(199,148,104,0.40); }
+.tier-bg-5 { background: rgba(198,104,96,0.12); border-color: rgba(198,104,96,0.45); }
 
 /* --- Buttons --- */
 .btn-leaf {
-  background: linear-gradient(180deg, #ffd97a, #ffb13a);
-  color: #1a1208;
-  border: 1px solid rgba(0,0,0,0.15);
+  background: linear-gradient(180deg, #d8b56e 0%, #b48848 100%);
+  color: #1a1206;
+  border: 1px solid rgba(0,0,0,0.18);
   box-shadow:
-    0 1px 0 rgba(255,255,255,0.5) inset,
-    0 -1px 0 rgba(0,0,0,0.15) inset,
-    0 8px 20px -8px rgba(255,200,87,0.55);
-  transition: transform 120ms ease, box-shadow 200ms ease, filter 200ms ease;
-  font-weight: 600;
+    0 1px 0 rgba(255,253,245,0.22) inset,
+    0 10px 28px -14px rgba(200,155,74,0.45);
+  transition: transform 140ms ease, filter 220ms ease, box-shadow 220ms ease;
+  font-weight: 500;
+  letter-spacing: 0.005em;
 }
-.btn-leaf:hover { filter: brightness(1.06); transform: translateY(-1px); }
+.btn-leaf:hover {
+  filter: brightness(1.05);
+  transform: translateY(-1px);
+  box-shadow:
+    0 1px 0 rgba(255,253,245,0.28) inset,
+    0 14px 34px -14px rgba(200,155,74,0.55);
+}
 .btn-leaf:active { transform: translateY(0); filter: brightness(0.96); }
 
 .btn-ghost {
-  background: rgba(255,255,255,0.04);
+  background: rgba(236,231,214,0.03);
   color: var(--paper);
-  border: 1px solid rgba(255,255,255,0.14);
-  transition: background 200ms ease, border-color 200ms ease;
+  border: 1px solid rgba(236,231,214,0.16);
+  transition: background 220ms ease, border-color 220ms ease;
   font-weight: 500;
+  letter-spacing: 0.005em;
 }
-.btn-ghost:hover { background: rgba(255,255,255,0.09); border-color: rgba(255,255,255,0.25); }
+.btn-ghost:hover { background: rgba(236,231,214,0.07); border-color: rgba(236,231,214,0.30); }
 
-/* --- Board treatments: chess.com-ish green theme --- */
-.sq-light { background-color: #eeeed2; }
-.sq-dark  { background-color: #769656; }
-.sq-sel   { box-shadow: inset 0 0 0 9999px rgba(255,217,122,0.45); }
-.sq-last  { box-shadow: inset 0 0 0 9999px rgba(255,217,122,0.28); }
+/* --- Board treatments: warm wood-tone, less candy than chess.com green --- */
+.sq-light { background-color: #e8dcc0; }
+.sq-dark  { background-color: #8d6e4b; }
+.sq-sel   { box-shadow: inset 0 0 0 9999px rgba(216,181,110,0.42); }
+.sq-last  { box-shadow: inset 0 0 0 9999px rgba(216,181,110,0.26); }
 .sq-sel.sq-last {
   box-shadow:
-    inset 0 0 0 9999px rgba(255,217,122,0.32),
-    inset 0 0 0 9999px rgba(255,217,122,0.18);
+    inset 0 0 0 9999px rgba(216,181,110,0.32),
+    inset 0 0 0 9999px rgba(216,181,110,0.18);
 }
-.sq-hover { box-shadow: inset 0 0 0 3px rgba(255,217,122,0.85); }
+.sq-hover { box-shadow: inset 0 0 0 3px rgba(216,181,110,0.85); }
 
 /* Move-target dot */
 .dot-target {
-  width: 28%;
-  height: 28%;
+  width: 26%;
+  height: 26%;
   border-radius: 9999px;
-  background: rgba(20, 30, 20, 0.35);
+  background: rgba(20, 14, 8, 0.32);
 }
 .dot-capture {
   position: absolute;
   inset: 6%;
   border-radius: 9999px;
-  border: 4px solid rgba(255,107,107,0.7);
+  border: 4px solid rgba(181,70,65,0.7);
 }
 
 /* --- Drag/drop --- */
@@ -172,7 +195,7 @@ body {
   pointer-events: none;
   z-index: 60;
   transform: translate(-50%, -50%);
-  filter: drop-shadow(0 14px 18px rgba(0,0,0,0.45));
+  filter: drop-shadow(0 14px 18px rgba(0,0,0,0.5));
 }
 
 /* --- Animations --- */
@@ -180,7 +203,7 @@ body {
   0% { opacity: 0; transform: translateY(20px) scale(0.96); }
   100% { opacity: 1; transform: translateY(0) scale(1); }
 }
-.animate-reveal { animation: drawback-reveal 0.5s cubic-bezier(0.2, 0.8, 0.2, 1); }
+.animate-reveal { animation: drawback-reveal 0.55s cubic-bezier(0.2, 0.8, 0.2, 1); }
 
 .no-tap-highlight { -webkit-tap-highlight-color: transparent; }
 
@@ -188,9 +211,9 @@ main, nav, header, footer { position: relative; z-index: 2; }
 
 /* Accessibility */
 :focus-visible {
-  outline: 2px solid rgba(255,200,87,0.9);
-  outline-offset: 2px;
-  border-radius: 4px;
+  outline: 1.5px solid rgba(216,181,110,0.85);
+  outline-offset: 3px;
+  border-radius: 2px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -204,30 +227,42 @@ main, nav, header, footer { position: relative; z-index: 2; }
   .btn-leaf, .btn-ghost { min-height: 44px; }
 }
 
-::selection { background: rgba(255,200,87,0.4); color: #1a1208; }
+::selection { background: rgba(216,181,110,0.4); color: #1a1206; }
 ::-webkit-scrollbar { width: 10px; height: 10px; }
-::-webkit-scrollbar-thumb { background: rgba(255,255,255,0.12); border-radius: 6px; }
-::-webkit-scrollbar-thumb:hover { background: rgba(255,255,255,0.25); }
+::-webkit-scrollbar-thumb { background: rgba(236,231,214,0.10); border-radius: 6px; }
+::-webkit-scrollbar-thumb:hover { background: rgba(236,231,214,0.22); }
 ::-webkit-scrollbar-track { background: transparent; }
 
-/* Decorative corners; softened (now barely visible) */
+/* Decorative corners — subtle brass tick marks for editorial framing */
 .card-corner {
   position: absolute;
   width: 14px;
   height: 14px;
-  border-color: rgba(255,200,87,0.35);
+  border-color: rgba(216,181,110,0.4);
   pointer-events: none;
 }
-.card-corner.tl { top: 8px; left: 8px; border-top: 1px solid; border-left: 1px solid; border-top-left-radius: 6px; }
-.card-corner.tr { top: 8px; right: 8px; border-top: 1px solid; border-right: 1px solid; border-top-right-radius: 6px; }
-.card-corner.bl { bottom: 8px; left: 8px; border-bottom: 1px solid; border-left: 1px solid; border-bottom-left-radius: 6px; }
-.card-corner.br { bottom: 8px; right: 8px; border-bottom: 1px solid; border-right: 1px solid; border-bottom-right-radius: 6px; }
+.card-corner.tl { top: 8px; left: 8px; border-top: 1px solid; border-left: 1px solid; }
+.card-corner.tr { top: 8px; right: 8px; border-top: 1px solid; border-right: 1px solid; }
+.card-corner.bl { bottom: 8px; left: 8px; border-bottom: 1px solid; border-left: 1px solid; }
+.card-corner.br { bottom: 8px; right: 8px; border-bottom: 1px solid; border-right: 1px solid; }
 
-/* The old "sigil" ring; kept but barely visible so existing landing markup doesn't break */
+/* Replace the old colorful sigil ring with a soft static brass aura */
 .sigil {
-  background: conic-gradient(from 0deg, transparent 0 30%, rgba(255,200,87,0.18) 30% 33%, transparent 33% 60%, rgba(167,139,250,0.14) 60% 63%, transparent 63%);
+  background:
+    radial-gradient(circle at 50% 50%, rgba(216,181,110,0.06), transparent 62%);
   border-radius: 9999px;
 }
 
-/* Parchment-noise overlay disabled; too busy for the new look */
 .parchment-noise::before { content: none !important; }
+
+/* Subtle paper grain over everything — adds editorial texture without busyness */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.04;
+  mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.92 0 0 0 0 0.90 0 0 0 0 0.84 0 0 0 0.7 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
