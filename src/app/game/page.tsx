@@ -350,23 +350,27 @@ function GamePage() {
               Resign
             </button>
           </div>
-          {hint && (
-            <div
-              role="status"
-              aria-live="polite"
-              className={
-                "plate p-3 px-4 flex items-center gap-3 " +
-                (hint.tone === "warn"
-                  ? "border-oxblood-glow/60 bg-oxblood/15"
-                  : "border-gold/40 bg-gold/10")
-              }
-            >
-              <span aria-hidden="true" className="text-gold-leaf font-display font-bold text-xl leading-none">!</span>
-              <span className="font-display text-[15px] text-parchment">
-                {hint.text}
-              </span>
-            </div>
-          )}
+          {/* Reserve a fixed slot for the hint so its appearance/disappearance
+              doesn't push the board down. The plate fades in when there's a hint. */}
+          <div className="min-h-[3.25rem]">
+            {hint && (
+              <div
+                role="status"
+                aria-live="polite"
+                className={
+                  "plate p-3 px-4 flex items-center gap-3 " +
+                  (hint.tone === "warn"
+                    ? "border-oxblood-glow/60 bg-oxblood/15"
+                    : "border-gold/40 bg-gold/10")
+                }
+              >
+                <span aria-hidden="true" className="text-gold-leaf font-display font-bold text-xl leading-none">!</span>
+                <span className="font-display text-[15px] text-parchment">
+                  {hint.text}
+                </span>
+              </div>
+            )}
+          </div>
           <Board
             board={virtualBoard ?? game.board}
             legalMoves={game.board.turn === myColor ? moves : premoveOptions}
