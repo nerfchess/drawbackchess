@@ -63,7 +63,7 @@ export const TROPHY_WIFE: Drawback = db({
   name: "Trophy Wife",
   description: "Your queen can't capture.",
   flavor: "She is for display only.",
-  tier: 2,
+  tier: 1,
   icon: "gem",
   implemented: true,
   filterMoves: (moves) => moves.filter((m) => !(m.piece === "q" && m.captured)),
@@ -74,7 +74,7 @@ export const LAME_DUCK: Drawback = db({
   name: "Lame Duck",
   description: "You can't move your king at all.",
   flavor: "His majesty is paralyzed with indecision.",
-  tier: 2,
+  tier: 3,
   icon: "lock",
   implemented: true,
   filterMoves: (moves) => moves.filter((m) => m.piece !== "k"),
@@ -145,7 +145,7 @@ export const IVORY_TOWER: Drawback = db({
   name: "Ivory Tower",
   description: "You lose if any opponent piece is adjacent to your king.",
   flavor: "Royalty does not mingle.",
-  tier: 2,
+  tier: 4,
   icon: "tower-control",
   implemented: true,
   checkLoss: (state, ctx) => {
@@ -274,7 +274,7 @@ export const CHAMPING_AT_THE_BIT: Drawback = db({
   name: "Champing at the Bit",
   description: "All pawn moves must be distance 2.",
   flavor: "Why walk when you can sprint?",
-  tier: 1,
+  tier: 3,
   icon: "fast-forward",
   implemented: true,
   filterMoves: (moves) =>
@@ -434,7 +434,7 @@ export const SLEEPY_KING: Drawback = db({
   name: "Sleepy King",
   description: "Your king can only move when in check.",
   flavor: "Don't wake him unless you must.",
-  tier: 1,
+  tier: 2,
   icon: "moon",
   implemented: true,
   filterMoves: (moves, _s, ctx) => {
@@ -466,6 +466,399 @@ export const SCORCHED_EARTH: Drawback = db({
   },
 });
 
+export const SKITTISH: Drawback = db({
+  id: "skittish",
+  name: "Skittish",
+  description: "While in check, you must move your king.",
+  flavor: "Run, your majesty.",
+  tier: 2,
+  icon: "alert",
+  implemented: true,
+  filterMoves: (moves, _s, ctx) => {
+    const { isInCheck } = require("../board");
+    if (!isInCheck(ctx.board, ctx.me)) return moves;
+    const kingMoves = moves.filter((m) => m.piece === "k");
+    return kingMoves.length ? kingMoves : moves;
+  },
+  hint: (_s, ctx) => {
+    const { isInCheck } = require("../board");
+    if (!isInCheck(ctx.board, ctx.me)) return null;
+    return { text: "You're in check — only the king may flee.", tone: "warn" };
+  },
+});
+
+export const HORSE_TRANQUILIZER: Drawback = db({
+  id: "horse_tranquilizer",
+  name: "Horse Tranquilizer",
+  description: "Your knights can't capture.",
+  flavor: "Their hooves are heavy with sleep.",
+  tier: 2,
+  icon: "moon",
+  implemented: true,
+  filterMoves: (moves) => moves.filter((m) => !(m.piece === "n" && m.captured)),
+});
+
+export const NUMBER_OF_THE_BEAST: Drawback = db({
+  id: "number_of_the_beast",
+  name: "Number of the Beast",
+  description: "You can't move to the 6th rank.",
+  flavor: "Six is the cursed number.",
+  tier: 1,
+  icon: "ban",
+  implemented: true,
+  filterMoves: (moves) => moves.filter((m) => RANK(m.to) !== 5),
+});
+
+export const SHADOW_QUEEN: Drawback = db({
+  id: "shadow_queen",
+  name: "Shadow Queen",
+  description: "Your queen can only move to dark squares.",
+  flavor: "She walks only in shadow.",
+  tier: 2,
+  icon: "moon-star",
+  implemented: true,
+  filterMoves: (moves) =>
+    moves.filter((m) => {
+      if (m.piece !== "q") return true;
+      // dark squares: (file + rank) even (a1 is dark)
+      return (FILE(m.to) + RANK(m.to)) % 2 === 0;
+    }),
+});
+
+export const NO_SHUFFLING: Drawback = db({
+  id: "no_shuffling",
+  name: "No Shuffling",
+  description: "Your rooks can't move sideways.",
+  flavor: "Vertical or nothing.",
+  tier: 2,
+  icon: "arrow-up-down",
+  implemented: true,
+  filterMoves: (moves) =>
+    moves.filter((m) => m.piece !== "r" || FILE(m.from) === FILE(m.to)),
+});
+
+export const OUTFLANKED: Drawback = db({
+  id: "outflanked",
+  name: "Outflanked",
+  description: "You can't capture on the rim. The enemy king is fair game anywhere.",
+  flavor: "The edges are scorched ground.",
+  tier: 3,
+  icon: "square-dashed",
+  implemented: true,
+  filterMoves: (moves) =>
+    moves.filter((m) => {
+      if (!m.captured || m.captured === "k") return true;
+      const f = FILE(m.to), r = RANK(m.to);
+      return f !== 0 && f !== 7 && r !== 0 && r !== 7;
+    }),
+});
+
+export const PROFESSIONAL_COURTESY: Drawback = db({
+  id: "professional_courtesy",
+  name: "Professional Courtesy",
+  description: "Non-pawn pieces can't capture pieces of their own type.",
+  flavor: "We do not stoop to such things.",
+  tier: 2,
+  icon: "handshake",
+  implemented: true,
+  filterMoves: (moves) =>
+    moves.filter((m) => {
+      if (m.piece === "p") return true;
+      if (!m.captured) return true;
+      return m.piece !== m.captured;
+    }),
+});
+
+export const CONSCIENTIOUS_OBJECTORS: Drawback = db({
+  id: "conscientious_objectors",
+  name: "Conscientious Objectors",
+  description: "Your pawns can't capture.",
+  flavor: "They refuse to draw blood.",
+  tier: 2,
+  icon: "feather",
+  implemented: true,
+  filterMoves: (moves) => moves.filter((m) => !(m.piece === "p" && m.captured)),
+});
+
+export const STAY_AT_HOME_MOM: Drawback = db({
+  id: "stay_at_home_mom",
+  name: "Stay-at-Home Mom",
+  description: "Your queen can only move within your two home ranks.",
+  flavor: "She manages the home front.",
+  tier: 3,
+  icon: "home",
+  implemented: true,
+  filterMoves: (moves, _s, ctx) =>
+    moves.filter((m) => {
+      if (m.piece !== "q") return true;
+      const home = ctx.me === "w" ? [0, 1] : [6, 7];
+      return home.includes(RANK(m.to));
+    }),
+});
+
+export const PUNCHING_DOWN: Drawback = db({
+  id: "punching_down",
+  name: "Punching Down",
+  description: "Pieces can't capture pieces worth more than themselves.",
+  flavor: "Pick on someone your own size.",
+  tier: 3,
+  icon: "shield",
+  implemented: true,
+  filterMoves: (moves) =>
+    moves.filter((m) => {
+      if (!m.captured || m.captured === "k") return true;
+      return PIECE_VAL[m.piece] >= PIECE_VAL[m.captured];
+    }),
+});
+
+export const ELEPHANTS_FEAR_MICE: Drawback = db({
+  id: "elephants_fear_mice",
+  name: "Elephants Fear Mice",
+  description: "Your non-pawn pieces can't capture pawns.",
+  flavor: "Even kings dread the squeak.",
+  tier: 3,
+  icon: "rat",
+  implemented: true,
+  filterMoves: (moves) =>
+    moves.filter((m) => !(m.piece !== "p" && m.captured === "p")),
+});
+
+export const FAR_SIGHTED: Drawback = db({
+  id: "far_sighted",
+  name: "Far Sighted",
+  description: "You can't capture adjacent pieces (Chebyshev distance > 1).",
+  flavor: "Your eyes don't focus that close.",
+  tier: 3,
+  icon: "eye",
+  implemented: true,
+  filterMoves: (moves) =>
+    moves.filter((m) => !m.captured || cheb(m.from, m.to) > 1),
+});
+
+export const SIMPLIFIER: Drawback = db({
+  id: "simplifier",
+  name: "Simplifier",
+  description: "If you can capture with an equal- or lesser-value piece, you must.",
+  flavor: "Trade up. Always trade up.",
+  tier: 3,
+  icon: "scale",
+  implemented: true,
+  filterMoves: (moves) => {
+    const favorable = moves.filter(
+      (m) => m.captured && m.captured !== "k" && PIECE_VAL[m.piece] <= PIECE_VAL[m.captured],
+    );
+    return favorable.length ? favorable : moves;
+  },
+  hint: (_s, _c, legal) => {
+    const favorable = legal.filter(
+      (m) => m.captured && m.captured !== "k" && PIECE_VAL[m.piece] <= PIECE_VAL[m.captured],
+    );
+    if (!favorable.length) return null;
+    return {
+      text: "You must take a favorable trade.",
+      squares: Array.from(new Set(favorable.map((m) => m.from))),
+      tone: "warn",
+    };
+  },
+});
+
+export const SPICE_OF_LIFE: Drawback = db({
+  id: "spice_of_life",
+  name: "Spice of Life",
+  description: "You can't move the same piece type twice in a row.",
+  flavor: "Variety is everything.",
+  tier: 2,
+  icon: "shuffle",
+  implemented: true,
+  filterMoves: (moves, _s, ctx) => {
+    const last = ctx.myLastMove;
+    if (!last) return moves;
+    return moves.filter((m) => m.piece !== last.piece);
+  },
+});
+
+export const STOP_STALLING: Drawback = db({
+  id: "stop_stalling",
+  name: "Stop Stalling",
+  description: "Your pieces can't move laterally.",
+  flavor: "Forward, backward, anywhere but sideways.",
+  tier: 3,
+  icon: "move-vertical",
+  implemented: true,
+  filterMoves: (moves) =>
+    moves.filter((m) => RANK(m.from) !== RANK(m.to)),
+});
+
+export const INSIDE_THE_LINES: Drawback = db({
+  id: "inside_the_lines",
+  name: "Inside the Lines",
+  description: "You can't move ONTO the rim. Pieces already on the rim may stay there.",
+  flavor: "Color outside the lines, lose your turn.",
+  tier: 3,
+  icon: "frame",
+  implemented: true,
+  filterMoves: (moves) =>
+    moves.filter((m) => {
+      const onRim = (sq: number) => {
+        const f = FILE(sq), r = RANK(sq);
+        return f === 0 || f === 7 || r === 0 || r === 7;
+      };
+      return !onRim(m.to) || onRim(m.from);
+    }),
+});
+
+export const ALTERNATOR: Drawback = db({
+  id: "alternator",
+  name: "Alternator",
+  description: "You must alternate pawn moves and non-pawn moves.",
+  flavor: "Step left, step right.",
+  tier: 3,
+  icon: "alternate",
+  implemented: true,
+  filterMoves: (moves, _s, ctx) => {
+    const last = ctx.myLastMove;
+    if (!last) return moves;
+    const needPawn = last.piece !== "p";
+    const filtered = moves.filter((m) => (m.piece === "p") === needPawn);
+    return filtered.length ? filtered : moves;
+  },
+  hint: (_s, ctx) => {
+    const last = ctx.myLastMove;
+    if (!last) return null;
+    return {
+      text: last.piece === "p"
+        ? "You moved a pawn last turn — now a non-pawn."
+        : "You moved a non-pawn — now a pawn.",
+      tone: "info",
+    };
+  },
+});
+
+export const KING_OF_THE_HILL: Drawback = db({
+  id: "king_of_the_hill",
+  name: "King of the Hill",
+  description: "After your first move, you lose unless one of your pieces sits on d4, d5, e4, or e5.",
+  flavor: "Hold the high ground.",
+  tier: 4,
+  icon: "mountain",
+  implemented: true,
+  checkLoss: (_s, ctx) => {
+    if (ctx.moveNumber < 1) return null;
+    const center = [SQ(3, 3), SQ(3, 4), SQ(4, 3), SQ(4, 4)];
+    for (const sq of center) {
+      const p = ctx.board.pieces[sq];
+      if (p && p.color === ctx.me) return null;
+    }
+    return { reason: "no piece on the hill" };
+  },
+});
+
+export const HOLD_THEM_BACK: Drawback = db({
+  id: "hold_them_back",
+  name: "Hold Them Back",
+  description: "You lose the moment any enemy pawn enters your half of the board.",
+  flavor: "Not one step.",
+  tier: 5,
+  icon: "shield-alert",
+  implemented: true,
+  checkLoss: (_s, ctx) => {
+    const myHalf = ctx.me === "w" ? [0, 1, 2, 3] : [4, 5, 6, 7];
+    for (let sq = 0; sq < 64; sq++) {
+      const p = ctx.board.pieces[sq];
+      if (p && p.color !== ctx.me && p.type === "p" && myHalf.includes(RANK(sq))) {
+        return { reason: "enemy pawn breached your half" };
+      }
+    }
+    return null;
+  },
+});
+
+export const DEER_IN_HEADLIGHTS: Drawback = db({
+  id: "deer_in_headlights",
+  name: "Deer in the Headlights",
+  description: "You can't move pieces that are currently under attack.",
+  flavor: "Frozen.",
+  tier: 5,
+  icon: "zap",
+  implemented: true,
+  filterMoves: (moves, _s, ctx) => {
+    const { attackedBy } = require("../board");
+    const opp = ctx.me === "w" ? "b" : "w";
+    const attacked = attackedBy(ctx.board, opp);
+    return moves.filter((m) => !attacked.has(m.from));
+  },
+});
+
+export const RESPECTFUL: Drawback = db({
+  id: "respectful",
+  name: "Respectful",
+  description: "You can't end your turn giving check.",
+  flavor: "Don't be rude.",
+  tier: 4,
+  icon: "hand",
+  implemented: true,
+  filterMoves: (moves, _s, ctx) => {
+    const { makeMove, isInCheck } = require("../board");
+    const opp = ctx.me === "w" ? "b" : "w";
+    return moves.filter((m) => {
+      const nb = makeMove(ctx.board, m);
+      return !isInCheck(nb, opp);
+    });
+  },
+});
+
+export const SIEGE: Drawback = db({
+  id: "siege",
+  name: "Siege",
+  description: "You must capture at least one enemy rook by move 20, or you lose.",
+  flavor: "Break their towers, or fall with them.",
+  tier: 4,
+  icon: "sword",
+  implemented: true,
+  checkLoss: (_s, ctx) => {
+    if (ctx.moveNumber < 20) return null;
+    return ctx.capturedByMe.r >= 1 ? null : { reason: "failed siege" };
+  },
+  hint: (_s, ctx) => {
+    if (ctx.moveNumber >= 20 || ctx.capturedByMe.r >= 1) return null;
+    const remaining = 20 - ctx.moveNumber;
+    if (remaining > 8) return null;
+    return {
+      text: `Capture a rook within ${remaining} more turn${remaining === 1 ? "" : "s"} or lose.`,
+      tone: "warn",
+    };
+  },
+});
+
+export const SCENT_OF_BLOOD: Drawback = db({
+  id: "scent_of_blood",
+  name: "The Scent of Blood",
+  description: "If one of your pieces can capture, it must — that piece, this turn.",
+  flavor: "Once they smell it, nothing else matters.",
+  tier: 4,
+  icon: "droplet",
+  implemented: true,
+  filterMoves: (moves) => {
+    const fromsWithCap = new Set<number>();
+    for (const m of moves) if (m.captured) fromsWithCap.add(m.from);
+    if (fromsWithCap.size === 0) return moves;
+    return moves.filter((m) => {
+      if (!fromsWithCap.has(m.from)) return true;
+      return !!m.captured;
+    });
+  },
+  hint: (_s, _c, legal) => {
+    const sources = new Set<number>();
+    for (const m of legal) if (m.captured) sources.add(m.from);
+    if (sources.size === 0) return null;
+    return {
+      text: "A piece smells blood — if it moves, it must capture.",
+      squares: Array.from(sources),
+      tone: "warn",
+    };
+  },
+});
+
 export const ALL_IMPLEMENTED: Drawback[] = [
   LUCKY,
   CESS,
@@ -492,6 +885,29 @@ export const ALL_IMPLEMENTED: Drawback[] = [
   PACK_MENTALITY,
   SLEEPY_KING,
   SCORCHED_EARTH,
+  SKITTISH,
+  HORSE_TRANQUILIZER,
+  NUMBER_OF_THE_BEAST,
+  SHADOW_QUEEN,
+  NO_SHUFFLING,
+  OUTFLANKED,
+  PROFESSIONAL_COURTESY,
+  CONSCIENTIOUS_OBJECTORS,
+  STAY_AT_HOME_MOM,
+  PUNCHING_DOWN,
+  ELEPHANTS_FEAR_MICE,
+  FAR_SIGHTED,
+  SIMPLIFIER,
+  SPICE_OF_LIFE,
+  STOP_STALLING,
+  INSIDE_THE_LINES,
+  ALTERNATOR,
+  KING_OF_THE_HILL,
+  HOLD_THEM_BACK,
+  DEER_IN_HEADLIGHTS,
+  RESPECTFUL,
+  SIEGE,
+  SCENT_OF_BLOOD,
 ];
 
 export const IMPLEMENTED_BY_ID: Record<string, Drawback> = Object.fromEntries(
