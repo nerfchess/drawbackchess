@@ -396,6 +396,49 @@ export function Board({
             );
           })}
         </div>
+        {/* Premove arrows: drawn as an SVG overlay covering the grid, one
+            arrow per queued premove pointing from→to. */}
+        {premoves && premoves.length > 0 && (
+          <svg
+            className="absolute inset-0 w-full h-full pointer-events-none"
+            viewBox="0 0 8 8"
+            preserveAspectRatio="none"
+          >
+            <defs>
+              <marker
+                id="premove-arrow-head"
+                viewBox="0 0 10 10"
+                refX="6"
+                refY="5"
+                markerWidth="4"
+                markerHeight="4"
+                orient="auto-start-reverse"
+              >
+                <path d="M 0 0 L 10 5 L 0 10 z" fill="rgb(189, 49, 49)" />
+              </marker>
+            </defs>
+            {premoves.map((pm, i) => {
+              const fx = orientation === "w" ? FILE(pm.from) : 7 - FILE(pm.from);
+              const fy = orientation === "w" ? 7 - RANK(pm.from) : RANK(pm.from);
+              const tx = orientation === "w" ? FILE(pm.to) : 7 - FILE(pm.to);
+              const ty = orientation === "w" ? 7 - RANK(pm.to) : RANK(pm.to);
+              return (
+                <line
+                  key={i}
+                  x1={fx + 0.5}
+                  y1={fy + 0.5}
+                  x2={tx + 0.5}
+                  y2={ty + 0.5}
+                  stroke="rgb(189, 49, 49)"
+                  strokeOpacity="0.85"
+                  strokeWidth="0.18"
+                  strokeLinecap="round"
+                  markerEnd="url(#premove-arrow-head)"
+                />
+              );
+            })}
+          </svg>
+        )}
       </div>
 
       {/* Floating drag ghost — position is written directly via ref to avoid React re-renders */}
