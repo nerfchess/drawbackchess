@@ -3,7 +3,7 @@
 import React, { useEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Piece } from "./Pieces";
-import { BoardState, Color, FILE, Move, RANK, SQ, Square } from "@/engine/types";
+import { BoardState, Color, FILE, Move, PieceType, RANK, SQ, Square } from "@/engine/types";
 import { playSelect } from "@/lib/sounds";
 
 interface Visual {
@@ -12,6 +12,12 @@ interface Visual {
   duckSquare?: number;
   bannedSquares?: number[];
   highlightSquares?: number[];
+}
+
+export interface QueuedPremove {
+  from: Square;
+  to: Square;
+  promotion?: PieceType;
 }
 
 interface Props {
@@ -23,6 +29,14 @@ interface Props {
   visual?: Visual;
   disabled?: boolean;
   lastMove?: Move | null;
+  premoveMode?: boolean;
+  premove?: QueuedPremove | null;
+  onCancelPremove?: () => void;
+}
+
+function castleRookSquare(color: Color, side: "k" | "q"): Square {
+  if (side === "k") return color === "w" ? 7 : 63;
+  return color === "w" ? 0 : 56;
 }
 
 interface DragState {
@@ -40,6 +54,9 @@ export function Board({
   visual,
   disabled,
   lastMove,
+  premoveMode = false,
+  premove,
+  onCancelPremove,
 }: Props) {
   const [selected, setSelected] = useState<Square | null>(null);
   const [promotionMove, setPromotionMove] = useState<Move[] | null>(null);
@@ -66,9 +83,25 @@ export function Board({
       for (const m of movesFrom.get(selected) ?? []) {
         if (!t[m.to]) t[m.to] = [];
         t[m.to].push(m);
+        if (m.castle) {
+          const rookSq = castleRookSquare(m.color, m.castle);
+          if (!t[rookSq]) t[rookSq] = [];
+          t[rookSq].push(m);
+        }
       }
     }
     return t;
+  }, [selected, movesFrom]);
+
+  const castleHintSquares = useMemo(() => {
+    const set = new Set<Square>();
+    if (selected != null) {
+      for (const m of movesFrom.get(selected) ?? []) {
+        if (!m.castle) continue;
+        set.add(castleRookSquare(m.color, m.castle));
+      }
+    }
+    return set;
   }, [selected, movesFrom]);
 
   const orderedSquares: Square[] = [];
@@ -99,6 +132,13 @@ export function Board({
     if (selected != null && targets[sq]) {
       const candidates = targets[sq];
       if (candidates.length > 1 && candidates[0].promotion) {
+        if (premoveMode) {
+          // auto-queen premove promotions; the user can't be asked mid-opponent-turn
+          const q = candidates.find((c) => c.promotion === "q") ?? candidates[0];
+          onMove(q);
+          setSelected(null);
+          return true;
+        }
         setPromotionMove(candidates);
         return true;
       }
@@ -114,7 +154,7 @@ export function Board({
     if (disabled) return;
     if (tryPlay(sq)) return;
     const piece = board.pieces[sq];
-    if (piece && piece.color === board.turn && movesFrom.has(sq)) {
+    if (piece && piece.color === myColor && movesFrom.has(sq)) {
       setSelected(sq);
       playSelect();
     } else {
@@ -127,7 +167,7 @@ export function Board({
     if (disabled) return;
     if (e.button !== undefined && e.button !== 0) return;
     const piece = board.pieces[sq];
-    if (!piece || piece.color !== board.turn || !movesFrom.has(sq)) return;
+    if (!piece || piece.color !== myColor || !movesFrom.has(sq)) return;
     const grid = boardRef.current?.querySelector("[data-board-grid]") as HTMLElement | null;
     if (!grid) return;
     const rect = grid.getBoundingClientRect();
@@ -220,18 +260,32 @@ export function Board({
 
   const draggedPiece = drag ? board.pieces[drag.from] : null;
 
+  const handleContextMenu = (e: React.MouseEvent) => {
+    // right-click cancels the queued premove (chess.com convention)
+    if (premove && onCancelPremove) {
+      e.preventDefault();
+      onCancelPremove();
+      setSelected(null);
+    }
+  };
+
   return (
     <div ref={boardRef} className="relative w-full max-w-[min(92vw,720px)] aspect-square mx-auto">
       {/* Outer frame: aged gilt border + plate */}
       <div className="absolute inset-0 plate gilt rounded-md" />
       <div className="absolute inset-2 sm:inset-3 rounded-sm overflow-hidden border border-black/40">
-        <div data-board-grid className="grid grid-cols-8 grid-rows-8 w-full h-full select-none">
+        <div
+          data-board-grid
+          className="grid grid-cols-8 grid-rows-8 w-full h-full select-none"
+          onContextMenu={handleContextMenu}
+        >
           {orderedSquares.map((sq) => {
             const f = FILE(sq), r = RANK(sq);
             const isLight = (f + r) % 2 === 1;
             const piece = board.pieces[sq];
             const isSelected = selected === sq;
-            const isTarget = !!targets[sq];
+            const isCastleHint = castleHintSquares.has(sq);
+            const isTarget = !!targets[sq] && !isCastleHint;
             const isCapture = isTarget && targets[sq].some((m) => !!m.captured);
             const banned = visual?.bannedSquares?.includes(sq);
             const isDuck = visual?.duckSquare === sq;
@@ -242,6 +296,8 @@ export function Board({
             const isHover = hoverSq === sq && drag != null;
             const isDragging = drag?.from === sq;
             const isForced = visual?.highlightSquares?.includes(sq);
+            const isPremoveFrom = premove?.from === sq;
+            const isPremoveTo = premove?.to === sq;
 
             const fogHide =
               !!visual?.fogged && piece && piece.color !== myColor && !lastTo;
@@ -251,7 +307,7 @@ export function Board({
               isLight ? "sq-light" : "sq-dark",
               isSelected ? "sq-sel" : "",
               (lastFrom || lastTo) ? "sq-last" : "",
-              isHover && isTarget ? "sq-hover" : "",
+              isHover && (isTarget || isCastleHint) ? "sq-hover" : "",
             ].join(" ");
 
             return (
@@ -260,7 +316,7 @@ export function Board({
                 onClick={() => handleSquareClick(sq)}
                 onPointerDown={(e) => piece && onPointerDownPiece(e, sq)}
                 className={classes}
-                style={{ cursor: piece && piece.color === board.turn && !disabled ? "grab" : "default" }}
+                style={{ cursor: piece && piece.color === myColor && !disabled ? "grab" : "default" }}
                 role="gridcell"
                 aria-label={`square ${"abcdefgh"[f]}${r + 1}`}
               >
@@ -295,6 +351,12 @@ export function Board({
                   ) : (
                     <div className="dot-target pointer-events-none" />
                   )
+                )}
+                {isCastleHint && (
+                  <div className="absolute inset-0 pointer-events-none ring-2 ring-inset ring-gold/70 rounded-sm" />
+                )}
+                {(isPremoveFrom || isPremoveTo) && (
+                  <div className="absolute inset-0 pointer-events-none bg-oxblood/45" />
                 )}
 
                 {f === (orientation === "w" ? 0 : 7) && (

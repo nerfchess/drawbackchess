@@ -19,7 +19,8 @@ import {
 } from "@/engine/game";
 import { makeSeed } from "@/engine/rng";
 import { Color, Move } from "@/engine/types";
-import { isInCheck } from "@/engine/board";
+import { cloneBoard, generateMoves, isInCheck } from "@/engine/board";
+import type { QueuedPremove } from "@/components/Board";
 import { buildCustomDrawback, CustomDrawback } from "@/engine/drawbacks/custom";
 import { isMuted, playCapture, playCheck, playDrawback, playMove as playMoveSfx, setMuted } from "@/lib/sounds";
 import Link from "next/link";
@@ -72,6 +73,7 @@ function GamePage() {
   const [game, setGame] = useState<DrawbackGame | null>(null);
   const [, force] = useState(0);
   const [muted, setMutedState] = useState(false);
+  const [premove, setPremove] = useState<QueuedPremove | null>(null);
   const aiThinking = useRef(false);
 
   useEffect(() => {
@@ -102,6 +104,24 @@ function GamePage() {
 
   const moves = useMemo(() => (game ? legalMoves(game) : []), [game]);
 
+  // Pseudo-legal moves for the user when it's not their turn — used to highlight
+  // valid premove targets. We clone the board and flip the turn, then ask the
+  // move generator. Drawback filtering is intentionally skipped: when the turn
+  // actually arrives we re-validate against real legal moves and drop the
+  // premove if it's no longer playable.
+  const premoveOptions = useMemo<Move[]>(() => {
+    if (!game || game.result) return [];
+    if (game.board.turn === myColor) return [];
+    const cloned = cloneBoard(game.board);
+    cloned.turn = myColor;
+    // En passant target was set for the *current* turn (opponent's). It does not
+    // belong to the premoving side — clear it so we don't generate phantom EP moves.
+    cloned.epTarget = null;
+    return generateMoves(cloned);
+  }, [game, myColor]);
+
+  const premoveMode = !!game && !game.result && game.board.turn !== myColor;
+
   // Played-move sound effects: react to history change.
   const lastSeenMoveCount = useRef(0);
   useEffect(() => {
@@ -129,6 +149,30 @@ function GamePage() {
       playDrawback();
     }
   }, [game?.result]);
+
+  // Execute queued premove when the turn returns to us. If the move is still
+  // legal (matching from/to/promotion), play it; otherwise discard.
+  useEffect(() => {
+    if (!premove || !game || game.result) return;
+    if (game.board.turn !== myColor) return;
+    const m = moves.find(
+      (lm) =>
+        lm.from === premove.from &&
+        lm.to === premove.to &&
+        (lm.promotion ?? undefined) === (premove.promotion ?? undefined),
+    );
+    if (!m) {
+      setPremove(null);
+      return;
+    }
+    // Small delay lets the opponent's move register visually before ours fires.
+    const tid = setTimeout(() => {
+      const next = playMove(game, m);
+      setGame({ ...next });
+      setPremove(null);
+    }, 90);
+    return () => clearTimeout(tid);
+  }, [game, premove, moves, myColor]);
 
   // AI move
   useEffect(() => {
@@ -170,10 +214,16 @@ function GamePage() {
 
   const handleMove = (m: Move) => {
     if (game.result) return;
-    if (game.board.turn !== myColor) return;
+    if (game.board.turn !== myColor) {
+      // queue as premove; replaces any prior one
+      setPremove({ from: m.from, to: m.to, promotion: m.promotion });
+      return;
+    }
     const next = playMove(game, m);
     setGame({ ...next });
   };
+
+  const cancelPremove = () => setPremove(null);
 
   const handleRematch = () => router.push("/play");
 
@@ -181,6 +231,7 @@ function GamePage() {
     if (!game.result) {
       resign(game, myColor);
       setGame({ ...game });
+      setPremove(null);
     }
   };
 
@@ -260,13 +311,16 @@ function GamePage() {
           )}
           <Board
             board={game.board}
-            legalMoves={game.board.turn === myColor ? moves : []}
+            legalMoves={game.board.turn === myColor ? moves : premoveOptions}
             orientation={myColor}
             onMove={handleMove}
             myColor={myColor}
             visual={{ ...(visual ?? {}), highlightSquares: forcedSquares }}
             lastMove={lastMove}
-            disabled={!!game.result || game.board.turn !== myColor}
+            disabled={!!game.result}
+            premoveMode={premoveMode}
+            premove={premove}
+            onCancelPremove={cancelPremove}
           />
         </div>
         <aside className="space-y-4">
