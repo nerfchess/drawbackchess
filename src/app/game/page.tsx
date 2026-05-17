@@ -139,7 +139,7 @@ function GamePage() {
   // there the real legal-move list won't include the move and the premove is
   // discarded.
   const { virtualBoard, validPremoves } = useMemo(() => {
-    if (!game || game.result || game.board.turn === myColor) {
+    if (!game || game.result || premoves.length === 0) {
       return { virtualBoard: null as BoardState | null, validPremoves: [] as QueuedPremove[] };
     }
     let board = cloneBoard(game.board);
@@ -169,7 +169,12 @@ function GamePage() {
     return premoveOptionsFor(virtualBoard, myColor);
   }, [virtualBoard, myColor]);
 
-  const premoveMode = !!virtualBoard;
+  // The board is in true premove mode only when it's the opponent's turn. When
+  // it's our turn and premoves are still pending, the head is about to commit;
+  // we keep showing the virtual board so the piece doesn't flicker back to its
+  // original square between the AI move landing and our queued move firing.
+  const premoveMode = !!game && !game.result && game.board.turn !== myColor && !!virtualBoard;
+  const premovePending = !!game && !game.result && game.board.turn === myColor && premoves.length > 0;
 
   // Played-move sound effects: react to history change.
   const lastSeenMoveCount = useRef(0);
@@ -392,13 +397,13 @@ function GamePage() {
           </div>
           <Board
             board={virtualBoard ?? game.board}
-            legalMoves={game.board.turn === myColor ? moves : premoveOptions}
+            legalMoves={game.board.turn === myColor && !premovePending ? moves : premoveOptions}
             orientation={myColor}
             onMove={handleMove}
             myColor={myColor}
             visual={{ ...(visual ?? {}), highlightSquares: forcedSquares }}
             lastMove={lastMove}
-            disabled={!!game.result}
+            disabled={!!game.result || premovePending}
             premoveMode={premoveMode}
             premoves={validPremoves}
             onCancelPremove={cancelPremove}

@@ -1,6 +1,7 @@
 import { Drawback } from "../drawback";
 import { findKing } from "../board";
 import { FILE, Move, PieceType, RANK, SQ, Square } from "../types";
+import { MORE_DRAWBACKS } from "./more";
 
 const cheb = (a: Square, b: Square) =>
   Math.max(Math.abs(FILE(a) - FILE(b)), Math.abs(RANK(a) - RANK(b)));
@@ -908,6 +909,7 @@ export const ALL_IMPLEMENTED: Drawback[] = [
   RESPECTFUL,
   SIEGE,
   SCENT_OF_BLOOD,
+  ...MORE_DRAWBACKS,
 ];
 
 export const IMPLEMENTED_BY_ID: Record<string, Drawback> = Object.fromEntries(
