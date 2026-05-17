@@ -97,6 +97,7 @@ function GamePage() {
   const [, force] = useState(0);
   const [muted, setMutedState] = useState(false);
   const [premoves, setPremoves] = useState<QueuedPremove[]>([]);
+  const [confirmingResign, setConfirmingResign] = useState(false);
   const aiThinking = useRef(false);
 
   useEffect(() => {
@@ -343,12 +344,30 @@ function GamePage() {
                 {whoseTurn}
               </span>
             </span>
-            <button
-              onClick={onResign}
-              className="px-4 py-1.5 rounded-full border border-oxblood/40 bg-oxblood/10 text-oxblood-glow hover:bg-oxblood/20 hover:border-oxblood/70 transition text-xs font-display font-semibold tracking-wide"
-            >
-              Resign
-            </button>
+            {confirmingResign ? (
+              <div className="flex items-center gap-2">
+                <span className="smallcaps text-[10px] text-parchment-300">Resign the game?</span>
+                <button
+                  onClick={() => { onResign(); setConfirmingResign(false); }}
+                  className="px-3 py-1.5 rounded-full border border-oxblood/70 bg-oxblood/25 text-oxblood-glow hover:bg-oxblood/40 transition text-xs font-display font-semibold tracking-wide"
+                >
+                  Yes, resign
+                </button>
+                <button
+                  onClick={() => setConfirmingResign(false)}
+                  className="px-3 py-1.5 rounded-full btn-ghost text-xs font-display tracking-wide"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <button
+                onClick={() => setConfirmingResign(true)}
+                className="px-4 py-1.5 rounded-full border border-oxblood/40 bg-oxblood/10 text-oxblood-glow hover:bg-oxblood/20 hover:border-oxblood/70 transition text-xs font-display font-semibold tracking-wide"
+              >
+                Resign
+              </button>
+            )}
           </div>
           {/* Reserve a fixed slot for the hint so its appearance/disappearance
               doesn't push the board down. The plate fades in when there's a hint. */}
