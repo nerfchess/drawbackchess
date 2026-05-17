@@ -28,8 +28,6 @@ interface Props {
 interface DragState {
   from: Square;
   pointerId: number;
-  x: number;
-  y: number;
   cell: number; // pixel size of one square
 }
 
@@ -48,6 +46,9 @@ export function Board({
   const [drag, setDrag] = useState<DragState | null>(null);
   const [hoverSq, setHoverSq] = useState<Square | null>(null);
   const boardRef = useRef<HTMLDivElement>(null);
+  const ghostRef = useRef<HTMLDivElement>(null);
+  const gridRectRef = useRef<DOMRect | null>(null);
+  const lastHoverRef = useRef<Square | null>(null);
 
   const movesFrom = useMemo(() => {
     const m = new Map<Square, Move[]>();
@@ -79,15 +80,16 @@ export function Board({
   if (orientation === "b") orderedSquares.reverse();
 
   const squareAtClient = (clientX: number, clientY: number): Square | null => {
-    const grid = boardRef.current?.querySelector("[data-board-grid]") as HTMLElement | null;
-    if (!grid) return null;
-    const rect = grid.getBoundingClientRect();
+    const rect = gridRectRef.current ?? (() => {
+      const grid = boardRef.current?.querySelector("[data-board-grid]") as HTMLElement | null;
+      return grid?.getBoundingClientRect() ?? null;
+    })();
+    if (!rect) return null;
     const x = clientX - rect.left;
     const y = clientY - rect.top;
     if (x < 0 || y < 0 || x > rect.width || y > rect.height) return null;
     const col = Math.min(7, Math.max(0, Math.floor((x / rect.width) * 8)));
     const row = Math.min(7, Math.max(0, Math.floor((y / rect.height) * 8)));
-    // visualRow 0 is the TOP. With orientation 'w', top row is rank 7.
     const file = orientation === "w" ? col : 7 - col;
     const rank = orientation === "w" ? 7 - row : row;
     return SQ(file, rank);
@@ -129,52 +131,89 @@ export function Board({
     const grid = boardRef.current?.querySelector("[data-board-grid]") as HTMLElement | null;
     if (!grid) return;
     const rect = grid.getBoundingClientRect();
+    gridRectRef.current = rect;
     const cell = rect.width / 8;
 
     setSelected(sq);
     playSelect();
-    setDrag({ from: sq, pointerId: e.pointerId, x: e.clientX, y: e.clientY, cell });
+    setDrag({ from: sq, pointerId: e.pointerId, cell });
     setHoverSq(sq);
-    // we deliberately do NOT call setPointerCapture: capture confines move events to the
-    // button element, which blocks "drag onto other square" detection.
+    lastHoverRef.current = sq;
+    // Pre-position the ghost so the first frame is right
+    requestAnimationFrame(() => {
+      if (ghostRef.current) {
+        ghostRef.current.style.transform = `translate3d(${e.clientX - cell / 2}px, ${e.clientY - cell / 2}px, 0)`;
+      }
+    });
     e.preventDefault();
   };
 
   useEffect(() => {
     if (!drag) return;
+    let rafId = 0;
+    let pendingX = 0;
+    let pendingY = 0;
+    let pending = false;
+
+    const flush = () => {
+      pending = false;
+      if (ghostRef.current) {
+        ghostRef.current.style.transform = `translate3d(${pendingX - drag.cell / 2}px, ${pendingY - drag.cell / 2}px, 0)`;
+      }
+      const sq = squareAtClient(pendingX, pendingY);
+      if (sq !== lastHoverRef.current) {
+        lastHoverRef.current = sq;
+        setHoverSq(sq);
+      }
+    };
+
     const onMove = (e: PointerEvent) => {
       if (e.pointerId !== drag.pointerId) return;
-      setDrag((d) => (d ? { ...d, x: e.clientX, y: e.clientY } : d));
-      setHoverSq(squareAtClient(e.clientX, e.clientY));
+      pendingX = e.clientX;
+      pendingY = e.clientY;
+      if (!pending) {
+        pending = true;
+        rafId = requestAnimationFrame(flush);
+      }
     };
     const onUp = (e: PointerEvent) => {
       if (e.pointerId !== drag.pointerId) return;
       const sq = squareAtClient(e.clientX, e.clientY);
       if (sq != null && sq !== drag.from && targets[sq]) {
         tryPlay(sq);
-      } else if (sq === drag.from) {
-        // released on origin: keep selection so click-to-move still works
-      } else if (sq != null) {
-        // released on a non-target square: clear selection
+      } else if (sq != null && sq !== drag.from) {
         setSelected(null);
       }
       setDrag(null);
       setHoverSq(null);
+      lastHoverRef.current = null;
+      gridRectRef.current = null;
     };
     const onCancel = () => {
       setDrag(null);
       setHoverSq(null);
+      lastHoverRef.current = null;
+      gridRectRef.current = null;
     };
-    window.addEventListener("pointermove", onMove);
+    const onScroll = () => {
+      // Re-measure if the page scrolls during a drag.
+      const grid = boardRef.current?.querySelector("[data-board-grid]") as HTMLElement | null;
+      if (grid) gridRectRef.current = grid.getBoundingClientRect();
+    };
+
+    window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerup", onUp);
     window.addEventListener("pointercancel", onCancel);
+    window.addEventListener("scroll", onScroll, { passive: true });
     return () => {
+      cancelAnimationFrame(rafId);
       window.removeEventListener("pointermove", onMove);
       window.removeEventListener("pointerup", onUp);
       window.removeEventListener("pointercancel", onCancel);
+      window.removeEventListener("scroll", onScroll);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drag, targets, orientation]);
+  }, [drag]);
 
   const inKingPass = (sq: Square) =>
     board.kingPassThrough.includes(sq) && board.kingPassColor !== myColor;
@@ -284,11 +323,18 @@ export function Board({
         </div>
       </div>
 
-      {/* Floating drag ghost */}
+      {/* Floating drag ghost — position is written directly via ref to avoid React re-renders */}
       {drag && draggedPiece && (
         <div
+          ref={ghostRef}
           className="drag-ghost"
-          style={{ left: drag.x, top: drag.y, width: drag.cell, height: drag.cell }}
+          style={{
+            left: 0,
+            top: 0,
+            width: drag.cell,
+            height: drag.cell,
+            willChange: "transform",
+          }}
         >
           <Piece type={draggedPiece.type} color={draggedPiece.color} size="100%" />
         </div>
