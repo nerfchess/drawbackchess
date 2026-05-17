@@ -5,7 +5,7 @@ import { DrawbackCard } from "@/components/DrawbackCard";
 import { GameOver } from "@/components/GameOver";
 import { MoveList } from "@/components/MoveList";
 import { AILevel, pickAIMove } from "@/engine/ai";
-import { Drawback } from "@/engine/drawback";
+import { Drawback, DrawbackState, GameContext } from "@/engine/drawback";
 import { IMPLEMENTED_BY_ID, PLAYABLE_DRAWBACKS } from "@/engine/drawbacks/library";
 import {
   applyTurnStart,
@@ -32,27 +32,27 @@ function pickRandomDrawback(): Drawback {
   return playable[Math.floor(Math.random() * playable.length)];
 }
 
-// Pseudo-legal premove options on a (turn-flipped) board, including moves that
-// would land on a friendly piece. The friendly-target moves get `captured` set
-// to the friendly's type as a placeholder, so the QueuedPremove records the
-// user's capture intent. At real-turn execute time we re-validate against
-// actual legal moves; the move only plays if the destination is actually an
-// enemy piece by then.
-function premoveOptionsFor(board: BoardState, me: Color): Move[] {
+// Pseudo-legal premove options on a (turn-flipped) board. Only moves to empty
+// squares or enemy squares are queueable; you can't premove a capture of your
+// own piece. The active drawback's filterMoves is also applied (best-effort
+// against the current drawback state) so you can't queue drawback-illegal
+// moves.
+function premoveOptionsFor(
+  board: BoardState,
+  me: Color,
+  drawback: Drawback | null,
+  drawbackState: DrawbackState | null,
+  ctx: GameContext | null,
+): Move[] {
   const base = generateMoves(board);
-  const extras: Move[] = [];
-  for (let sq = 0; sq < 64; sq++) {
-    const p = board.pieces[sq];
-    if (!p || p.color !== me || p.type === "k") continue;
-    const tmp = cloneBoard(board);
-    tmp.pieces[sq] = null;
-    const all = generateMoves(tmp);
-    for (const m of all) {
-      if (m.to !== sq) continue;
-      extras.push({ ...m, captured: p.type });
+  if (drawback?.filterMoves && drawbackState && ctx) {
+    try {
+      return drawback.filterMoves(base, drawbackState, ctx);
+    } catch {
+      return base;
     }
   }
-  return [...base, ...extras];
+  return base;
 }
 
 export default function GamePageWrapper() {
@@ -98,6 +98,7 @@ function GamePage() {
   const [muted, setMutedState] = useState(false);
   const [premoves, setPremoves] = useState<QueuedPremove[]>([]);
   const [confirmingResign, setConfirmingResign] = useState(false);
+  const [drawOfferStatus, setDrawOfferStatus] = useState<"idle" | "offering" | "declined">("idle");
   const aiThinking = useRef(false);
 
   useEffect(() => {
@@ -138,6 +139,9 @@ function GamePage() {
   // opponent capturing first; at execute time, if the friendly piece is still
   // there the real legal-move list won't include the move and the premove is
   // discarded.
+  const myDrawbackForPremove = game ? (myColor === "w" ? game.white.drawback : game.black.drawback) : null;
+  const myStateForPremove = game ? (myColor === "w" ? game.white.state : game.black.state) : null;
+
   const { virtualBoard, validPremoves } = useMemo(() => {
     if (!game || game.result || premoves.length === 0) {
       return { virtualBoard: null as BoardState | null, validPremoves: [] as QueuedPremove[] };
@@ -147,13 +151,21 @@ function GamePage() {
     board.epTarget = null;
     const valid: QueuedPremove[] = [];
     for (const pm of premoves) {
-      const options = premoveOptionsFor(board, myColor);
+      const ctx: GameContext = {
+        board,
+        me: myColor,
+        opponentLastMove: [...board.history].reverse().find((m) => m.color !== myColor) ?? null,
+        myLastMove: [...board.history].reverse().find((m) => m.color === myColor) ?? null,
+        moveNumber: board.history.filter((m) => m.color === myColor).length,
+        capturedByMe: game.captured[myColor],
+        capturedFromMe: game.captured[myColor === "w" ? "b" : "w"],
+      };
+      const options = premoveOptionsFor(board, myColor, myDrawbackForPremove, myStateForPremove, ctx);
       const match = options.find(
         (c) =>
           c.from === pm.from &&
           c.to === pm.to &&
-          (c.promotion ?? undefined) === (pm.promotion ?? undefined) &&
-          (!pm.capture || !!c.captured),
+          (c.promotion ?? undefined) === (pm.promotion ?? undefined),
       );
       if (!match) break;
       board = makeMove(board, match);
@@ -162,12 +174,21 @@ function GamePage() {
       valid.push(pm);
     }
     return { virtualBoard: board, validPremoves: valid };
-  }, [game, myColor, premoves]);
+  }, [game, myColor, premoves, myDrawbackForPremove, myStateForPremove]);
 
   const premoveOptions = useMemo<Move[]>(() => {
-    if (!virtualBoard) return [];
-    return premoveOptionsFor(virtualBoard, myColor);
-  }, [virtualBoard, myColor]);
+    if (!virtualBoard || !game) return [];
+    const ctx: GameContext = {
+      board: virtualBoard,
+      me: myColor,
+      opponentLastMove: [...virtualBoard.history].reverse().find((m) => m.color !== myColor) ?? null,
+      myLastMove: [...virtualBoard.history].reverse().find((m) => m.color === myColor) ?? null,
+      moveNumber: virtualBoard.history.filter((m) => m.color === myColor).length,
+      capturedByMe: game.captured[myColor],
+      capturedFromMe: game.captured[myColor === "w" ? "b" : "w"],
+    };
+    return premoveOptionsFor(virtualBoard, myColor, myDrawbackForPremove, myStateForPremove, ctx);
+  }, [virtualBoard, myColor, game, myDrawbackForPremove, myStateForPremove]);
 
   // The board is in true premove mode only when it's the opponent's turn. When
   // it's our turn and premoves are still pending, the head is about to commit;
@@ -216,8 +237,7 @@ function GamePage() {
       (lm) =>
         lm.from === head.from &&
         lm.to === head.to &&
-        (lm.promotion ?? undefined) === (head.promotion ?? undefined) &&
-        (!head.capture || !!lm.captured),
+        (lm.promotion ?? undefined) === (head.promotion ?? undefined),
     );
     if (!m) {
       setPremoves([]);
@@ -299,6 +319,33 @@ function GamePage() {
     }
   };
 
+  const onOfferDraw = () => {
+    if (game.result || drawOfferStatus !== "idle") return;
+    setDrawOfferStatus("offering");
+    // Simple AI policy: accept if its material isn't ahead. Otherwise decline.
+    const vals: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+    let mine = 0, theirs = 0;
+    for (const p of game.board.pieces) {
+      if (!p) continue;
+      const v = vals[p.type] ?? 0;
+      if (p.color === myColor) mine += v;
+      else theirs += v;
+    }
+    // AI accepts if it isn't ahead by more than 2.
+    const aiAhead = theirs - mine;
+    window.setTimeout(() => {
+      if (aiAhead <= 2) {
+        game.result = { winner: "draw", reason: "draw by agreement" };
+        setGame({ ...game });
+        setPremoves([]);
+        setDrawOfferStatus("idle");
+      } else {
+        setDrawOfferStatus("declined");
+        window.setTimeout(() => setDrawOfferStatus("idle"), 2500);
+      }
+    }, 800);
+  };
+
   const toggleMute = () => {
     const next = !muted;
     setMuted(next);
@@ -366,12 +413,24 @@ function GamePage() {
                 </button>
               </div>
             ) : (
-              <button
-                onClick={() => setConfirmingResign(true)}
-                className="px-4 py-1.5 rounded-full border border-oxblood/40 bg-oxblood/10 text-oxblood-glow hover:bg-oxblood/20 hover:border-oxblood/70 transition text-xs font-display font-semibold tracking-wide"
-              >
-                Resign
-              </button>
+              <div className="flex items-center gap-2">
+                {drawOfferStatus === "declined" && (
+                  <span className="smallcaps text-[10px] text-parchment-300">Draw declined.</span>
+                )}
+                <button
+                  onClick={onOfferDraw}
+                  disabled={drawOfferStatus !== "idle"}
+                  className="px-4 py-1.5 rounded-full border border-gold/40 bg-gold/10 text-gold-leaf hover:bg-gold/20 hover:border-gold/70 transition text-xs font-display font-semibold tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {drawOfferStatus === "offering" ? "Offering…" : "Offer Draw"}
+                </button>
+                <button
+                  onClick={() => setConfirmingResign(true)}
+                  className="px-4 py-1.5 rounded-full border border-oxblood/40 bg-oxblood/10 text-oxblood-glow hover:bg-oxblood/20 hover:border-oxblood/70 transition text-xs font-display font-semibold tracking-wide"
+                >
+                  Resign
+                </button>
+              </div>
             )}
           </div>
           {/* Reserve a fixed slot for the hint so its appearance/disappearance
