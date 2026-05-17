@@ -178,7 +178,7 @@ function GamePage() {
   const myStateForPremove = game ? (myColor === "w" ? game.white.state : game.black.state) : null;
 
   const { virtualBoard, validPremoves } = useMemo(() => {
-    if (!game || game.result || premoves.length === 0) {
+    if (!game || game.result || game.board.turn === myColor) {
       return { virtualBoard: null as BoardState | null, validPremoves: [] as QueuedPremove[] };
     }
     let board = cloneBoard(game.board);
@@ -521,6 +521,13 @@ function GamePage() {
               </div>
             )}
           </div>
+          {clockEnabled && (
+            <ClockPill
+              label="Opponent"
+              ms={myColor === "w" ? blackMs : whiteMs}
+              active={!game.result && game.board.turn !== myColor}
+            />
+          )}
           <Board
             board={virtualBoard ?? game.board}
             legalMoves={game.board.turn === myColor && !premovePending ? moves : premoveOptions}
@@ -534,22 +541,15 @@ function GamePage() {
             premoves={validPremoves}
             onCancelPremove={cancelPremove}
           />
+          {clockEnabled && (
+            <ClockPill
+              label="You"
+              ms={myColor === "w" ? whiteMs : blackMs}
+              active={!game.result && game.board.turn === myColor}
+            />
+          )}
         </div>
         <aside className="space-y-4">
-          {clockEnabled && (
-            <div className="grid grid-cols-2 gap-2">
-              <ClockPill
-                label="Opponent"
-                ms={myColor === "w" ? blackMs : whiteMs}
-                active={!game.result && game.board.turn !== myColor}
-              />
-              <ClockPill
-                label="You"
-                ms={myColor === "w" ? whiteMs : blackMs}
-                active={!game.result && game.board.turn === myColor}
-              />
-            </div>
-          )}
           <DrawbackCard drawback={myDrawback} />
           <DrawbackCard drawback={opponentDrawback} revealed={!!game.result} />
           <MoveList moves={game.board.history} />

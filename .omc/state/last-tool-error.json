@@ -1,0 +1,7 @@
+{
+  "tool_name": "Bash",
+  "tool_input_preview": "{\"command\":\"cd C:/Users/Jojo/Documents/GitHub/drawbackchess && git add src/components/Pieces.tsx src/app/play/page.tsx src/app/game/page.tsx && git commit -m \\\"$(cat <<'EOF'\\nMemoize Piece (fix premov...",
+  "error": "Exit code 1\n[claude/chess-game-webapp-fXIvH 47aae42] Memoize Piece (fix premove flicker) + chess.com-style clocks\n 3 files changed, 110 insertions(+), 2 deletions(-)\nFrom https://github.com/idontreallyknow-20/drawbackchess\n   f7751ee..28dc475  claude/chess-game-webapp-fXIvH -> origin/claude/chess-game-webapp-fXIvH\n * [new branch]      claude/implement-game-drawbacks-fQhHm -> origin/claude/implement-game-drawbacks-fQhHm\nRebasing (1/1)\rAuto-merging src/app/game/page.tsx\nCONFLICT (content): Merge c...",
+  "timestamp": "2026-05-17T21:30:24.698Z",
+  "retry_count": 1
+}

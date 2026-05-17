@@ -39,6 +39,21 @@ export default function PlayPage() {
           Pick how you want to play. You'll get a random secret rule (or pick one to practice).
         </p>
 
+        <div className="mt-6 flex flex-wrap gap-3">
+          <Link
+            href="/friend"
+            className="inline-flex items-center gap-2 px-5 py-3 rounded-sm btn-ghost font-body text-sm"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" />
+              <circle cx="9" cy="7" r="4" />
+              <path d="M23 21v-2a4 4 0 0 0-3-3.87" />
+              <path d="M16 3.13a4 4 0 0 1 0 7.75" />
+            </svg>
+            Play a Friend
+          </Link>
+        </div>
+
         <div className="mt-8 plate p-6 sm:p-7 space-y-6">
           <Group label="Bot strength">
             {(["easy", "medium", "hard"] as const).map((d) => (

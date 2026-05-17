@@ -33,6 +33,9 @@ export default function HomePage() {
             <Link href="/play" className="px-7 py-3 rounded-sm btn-leaf font-body text-base">
               Play now
             </Link>
+            <Link href="/friend" className="px-7 py-3 rounded-sm btn-ghost font-body">
+              Play a friend
+            </Link>
             <Link href="/codex" className="px-7 py-3 rounded-sm btn-ghost font-body">
               Browse the rules
             </Link>
