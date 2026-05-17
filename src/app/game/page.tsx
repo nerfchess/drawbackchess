@@ -18,8 +18,8 @@ import {
   resign,
 } from "@/engine/game";
 import { makeSeed } from "@/engine/rng";
-import { Color, Move } from "@/engine/types";
-import { cloneBoard, generateMoves, isInCheck } from "@/engine/board";
+import { BoardState, Color, Move } from "@/engine/types";
+import { cloneBoard, generateMoves, isInCheck, makeMove } from "@/engine/board";
 import type { QueuedPremove } from "@/components/Board";
 import { buildCustomDrawback, CustomDrawback } from "@/engine/drawbacks/custom";
 import { isMuted, playCapture, playCheck, playDrawback, playMove as playMoveSfx, setMuted } from "@/lib/sounds";
@@ -30,6 +30,29 @@ import { Suspense, useEffect, useMemo, useRef, useState } from "react";
 function pickRandomDrawback(): Drawback {
   const playable = PLAYABLE_DRAWBACKS.filter((d) => d.id !== "lucky");
   return playable[Math.floor(Math.random() * playable.length)];
+}
+
+// Pseudo-legal premove options on a (turn-flipped) board, including moves that
+// would land on a friendly piece. The friendly-target moves get `captured` set
+// to the friendly's type as a placeholder, so the QueuedPremove records the
+// user's capture intent. At real-turn execute time we re-validate against
+// actual legal moves; the move only plays if the destination is actually an
+// enemy piece by then.
+function premoveOptionsFor(board: BoardState, me: Color): Move[] {
+  const base = generateMoves(board);
+  const extras: Move[] = [];
+  for (let sq = 0; sq < 64; sq++) {
+    const p = board.pieces[sq];
+    if (!p || p.color !== me || p.type === "k") continue;
+    const tmp = cloneBoard(board);
+    tmp.pieces[sq] = null;
+    const all = generateMoves(tmp);
+    for (const m of all) {
+      if (m.to !== sq) continue;
+      extras.push({ ...m, captured: p.type });
+    }
+  }
+  return [...base, ...extras];
 }
 
 export default function GamePageWrapper() {
@@ -73,7 +96,7 @@ function GamePage() {
   const [game, setGame] = useState<DrawbackGame | null>(null);
   const [, force] = useState(0);
   const [muted, setMutedState] = useState(false);
-  const [premove, setPremove] = useState<QueuedPremove | null>(null);
+  const [premoves, setPremoves] = useState<QueuedPremove[]>([]);
   const aiThinking = useRef(false);
 
   useEffect(() => {
@@ -104,23 +127,48 @@ function GamePage() {
 
   const moves = useMemo(() => (game ? legalMoves(game) : []), [game]);
 
-  // Pseudo-legal moves for the user when it's not their turn — used to highlight
-  // valid premove targets. We clone the board and flip the turn, then ask the
-  // move generator. Drawback filtering is intentionally skipped: when the turn
-  // actually arrives we re-validate against real legal moves and drop the
-  // premove if it's no longer playable.
-  const premoveOptions = useMemo<Move[]>(() => {
-    if (!game || game.result) return [];
-    if (game.board.turn === myColor) return [];
-    const cloned = cloneBoard(game.board);
-    cloned.turn = myColor;
-    // En passant target was set for the *current* turn (opponent's). It does not
-    // belong to the premoving side — clear it so we don't generate phantom EP moves.
-    cloned.epTarget = null;
-    return generateMoves(cloned);
-  }, [game, myColor]);
+  // Build a "virtual" board that reflects the current actual board with every
+  // queued premove applied in sequence. Pseudo-legal options for further
+  // premoves are generated against this virtual board, so chained premoves
+  // (move A then move B with A already applied) work naturally.
+  //
+  // We also synthesize "friendly-target" moves: moves that would land on one
+  // of our own pieces. The user can premove these in anticipation of the
+  // opponent capturing first; at execute time, if the friendly piece is still
+  // there the real legal-move list won't include the move and the premove is
+  // discarded.
+  const { virtualBoard, validPremoves } = useMemo(() => {
+    if (!game || game.result || game.board.turn === myColor) {
+      return { virtualBoard: null as BoardState | null, validPremoves: [] as QueuedPremove[] };
+    }
+    let board = cloneBoard(game.board);
+    board.turn = myColor;
+    board.epTarget = null;
+    const valid: QueuedPremove[] = [];
+    for (const pm of premoves) {
+      const options = premoveOptionsFor(board, myColor);
+      const match = options.find(
+        (c) =>
+          c.from === pm.from &&
+          c.to === pm.to &&
+          (c.promotion ?? undefined) === (pm.promotion ?? undefined) &&
+          (!pm.capture || !!c.captured),
+      );
+      if (!match) break;
+      board = makeMove(board, match);
+      board.turn = myColor;
+      board.epTarget = null;
+      valid.push(pm);
+    }
+    return { virtualBoard: board, validPremoves: valid };
+  }, [game, myColor, premoves]);
 
-  const premoveMode = !!game && !game.result && game.board.turn !== myColor;
+  const premoveOptions = useMemo<Move[]>(() => {
+    if (!virtualBoard) return [];
+    return premoveOptionsFor(virtualBoard, myColor);
+  }, [virtualBoard, myColor]);
+
+  const premoveMode = !!virtualBoard;
 
   // Played-move sound effects: react to history change.
   const lastSeenMoveCount = useRef(0);
@@ -150,29 +198,32 @@ function GamePage() {
     }
   }, [game?.result]);
 
-  // Execute queued premove when the turn returns to us. If the move is still
-  // legal (matching from/to/promotion), play it; otherwise discard.
+  // Execute the head of the premove queue when our turn returns. If the head
+  // is no longer playable (target ran away, piece pinned, friendly target
+  // still standing) we clear the whole queue — subsequent links assumed the
+  // head would land, so they can't be salvaged.
   useEffect(() => {
-    if (!premove || !game || game.result) return;
+    if (premoves.length === 0 || !game || game.result) return;
     if (game.board.turn !== myColor) return;
+    const head = premoves[0];
     const m = moves.find(
       (lm) =>
-        lm.from === premove.from &&
-        lm.to === premove.to &&
-        (lm.promotion ?? undefined) === (premove.promotion ?? undefined),
+        lm.from === head.from &&
+        lm.to === head.to &&
+        (lm.promotion ?? undefined) === (head.promotion ?? undefined) &&
+        (!head.capture || !!lm.captured),
     );
     if (!m) {
-      setPremove(null);
+      setPremoves([]);
       return;
     }
-    // Small delay lets the opponent's move register visually before ours fires.
     const tid = setTimeout(() => {
       const next = playMove(game, m);
       setGame({ ...next });
-      setPremove(null);
+      setPremoves((q) => q.slice(1));
     }, 90);
     return () => clearTimeout(tid);
-  }, [game, premove, moves, myColor]);
+  }, [game, premoves, moves, myColor]);
 
   // AI move
   useEffect(() => {
@@ -180,7 +231,10 @@ function GamePage() {
     if (game.board.turn === myColor) return;
     if (aiThinking.current) return;
     aiThinking.current = true;
-    const delay = difficulty === "easy" ? 120 : difficulty === "medium" ? 200 : 320;
+    // Visual minimum wait; the engine's iterative-deepening search budget runs
+    // inside this window, so the move appears deliberate even when the search
+    // finishes early.
+    const delay = difficulty === "easy" ? 600 : difficulty === "medium" ? 1200 : 2000;
     const tid = setTimeout(() => {
       const m = pickAIMove(game, difficulty);
       if (m) {
@@ -215,15 +269,19 @@ function GamePage() {
   const handleMove = (m: Move) => {
     if (game.result) return;
     if (game.board.turn !== myColor) {
-      // queue as premove; replaces any prior one
-      setPremove({ from: m.from, to: m.to, promotion: m.promotion });
+      // append to the premove queue; chained premoves are evaluated against
+      // the virtual board derived from any prior queued moves
+      setPremoves((q) => [
+        ...q,
+        { from: m.from, to: m.to, promotion: m.promotion, capture: !!m.captured },
+      ]);
       return;
     }
     const next = playMove(game, m);
     setGame({ ...next });
   };
 
-  const cancelPremove = () => setPremove(null);
+  const cancelPremove = () => setPremoves([]);
 
   const handleRematch = () => router.push("/play");
 
@@ -231,7 +289,7 @@ function GamePage() {
     if (!game.result) {
       resign(game, myColor);
       setGame({ ...game });
-      setPremove(null);
+      setPremoves([]);
     }
   };
 
@@ -310,7 +368,7 @@ function GamePage() {
             </div>
           )}
           <Board
-            board={game.board}
+            board={virtualBoard ?? game.board}
             legalMoves={game.board.turn === myColor ? moves : premoveOptions}
             orientation={myColor}
             onMove={handleMove}
@@ -319,7 +377,7 @@ function GamePage() {
             lastMove={lastMove}
             disabled={!!game.result}
             premoveMode={premoveMode}
-            premove={premove}
+            premoves={validPremoves}
             onCancelPremove={cancelPremove}
           />
         </div>

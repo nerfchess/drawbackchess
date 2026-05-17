@@ -1,6 +1,6 @@
 import { findKing, generateMoves, makeMove } from "./board";
-import { DrawbackGame, legalMoves, makeContext } from "./game";
-import { BoardState, Color, FILE, Move, RANK } from "./types";
+import { DrawbackGame, legalMoves } from "./game";
+import { BoardState, Color, Move, PieceType } from "./types";
 
 // A move is self-losing if making it (a) lets the opponent capture our king for free
 // next ply, or (b) trips our own drawback's checkLoss on the resulting board.
@@ -20,80 +20,227 @@ function isSelfLosing(game: DrawbackGame, move: Move): boolean {
     };
     if (slot.drawback.checkLoss(slot.state, ctx)) return true;
   }
-  // king-en-passant exposure check is already encoded in normal move evaluation;
-  // for simplicity we don't deepen here.
   return false;
 }
 
-const VAL: Record<string, number> = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+const VAL: Record<PieceType, number> = { p: 100, n: 320, b: 330, r: 500, q: 900, k: 20000 };
+
+// Piece-square tables — white's perspective, indexed by sq (rank 0 = white's back rank).
+// Black uses `sq ^ 56` to mirror vertically. Values adapted from Chess Programming
+// Wiki's simplified evaluation function.
+const PST: Record<PieceType, number[]> = {
+  p: [
+       0,   0,   0,   0,   0,   0,   0,   0,
+       5,  10,  10, -20, -20,  10,  10,   5,
+       5,  -5, -10,   0,   0, -10,  -5,   5,
+       0,   0,   0,  20,  20,   0,   0,   0,
+       5,   5,  10,  25,  25,  10,   5,   5,
+      10,  10,  20,  30,  30,  20,  10,  10,
+      50,  50,  50,  50,  50,  50,  50,  50,
+       0,   0,   0,   0,   0,   0,   0,   0,
+  ],
+  n: [
+     -50, -40, -30, -30, -30, -30, -40, -50,
+     -40, -20,   0,   5,   5,   0, -20, -40,
+     -30,   5,  10,  15,  15,  10,   5, -30,
+     -30,   0,  15,  20,  20,  15,   0, -30,
+     -30,   5,  15,  20,  20,  15,   5, -30,
+     -30,   0,  10,  15,  15,  10,   0, -30,
+     -40, -20,   0,   0,   0,   0, -20, -40,
+     -50, -40, -30, -30, -30, -30, -40, -50,
+  ],
+  b: [
+     -20, -10, -10, -10, -10, -10, -10, -20,
+     -10,   5,   0,   0,   0,   0,   5, -10,
+     -10,  10,  10,  10,  10,  10,  10, -10,
+     -10,   0,  10,  10,  10,  10,   0, -10,
+     -10,   5,   5,  10,  10,   5,   5, -10,
+     -10,   0,   5,  10,  10,   5,   0, -10,
+     -10,   0,   0,   0,   0,   0,   0, -10,
+     -20, -10, -10, -10, -10, -10, -10, -20,
+  ],
+  r: [
+       0,   0,   0,   5,   5,   0,   0,   0,
+      -5,   0,   0,   0,   0,   0,   0,  -5,
+      -5,   0,   0,   0,   0,   0,   0,  -5,
+      -5,   0,   0,   0,   0,   0,   0,  -5,
+      -5,   0,   0,   0,   0,   0,   0,  -5,
+      -5,   0,   0,   0,   0,   0,   0,  -5,
+       5,  10,  10,  10,  10,  10,  10,   5,
+       0,   0,   0,   0,   0,   0,   0,   0,
+  ],
+  q: [
+     -20, -10, -10,  -5,  -5, -10, -10, -20,
+     -10,   0,   5,   0,   0,   0,   0, -10,
+     -10,   5,   5,   5,   5,   5,   0, -10,
+       0,   0,   5,   5,   5,   5,   0,  -5,
+      -5,   0,   5,   5,   5,   5,   0,  -5,
+     -10,   0,   5,   5,   5,   5,   0, -10,
+     -10,   0,   0,   0,   0,   0,   0, -10,
+     -20, -10, -10,  -5,  -5, -10, -10, -20,
+  ],
+  k: [
+      20,  30,  10,   0,   0,  10,  30,  20,
+      20,  20,   0,   0,   0,   0,  20,  20,
+     -10, -20, -20, -20, -20, -20, -20, -10,
+     -20, -30, -30, -40, -40, -30, -30, -20,
+     -30, -40, -40, -50, -50, -40, -40, -30,
+     -30, -40, -40, -50, -50, -40, -40, -30,
+     -30, -40, -40, -50, -50, -40, -40, -30,
+     -30, -40, -40, -50, -50, -40, -40, -30,
+  ],
+};
 
 function evaluate(board: BoardState, me: Color): number {
   let score = 0;
   for (let sq = 0; sq < 64; sq++) {
     const p = board.pieces[sq];
     if (!p) continue;
-    const v = VAL[p.type] + centerBonus(sq, p.type);
+    const idx = p.color === "w" ? sq : sq ^ 56;
+    const v = VAL[p.type] + PST[p.type][idx];
     score += p.color === me ? v : -v;
   }
   return score;
 }
 
-function centerBonus(sq: number, t: string): number {
-  const f = FILE(sq), r = RANK(sq);
-  const center = (Math.min(f, 7 - f) + Math.min(r, 7 - r));
-  if (t === "n" || t === "b") return center * 3;
-  if (t === "p") return center * 2;
-  return 0;
+function sameMove(a: Move, b: Move): boolean {
+  return a.from === b.from && a.to === b.to && (a.promotion ?? null) === (b.promotion ?? null);
+}
+
+// MVV-LVA — most valuable victim taken by least valuable attacker is best.
+// Optional priority move (e.g., PV move from prior iteration) sorts first.
+function orderMoves(moves: Move[], priority?: Move | null): Move[] {
+  const scored = moves.map((m) => {
+    let s = m.captured ? VAL[m.captured] * 10 - VAL[m.piece] : 0;
+    if (m.promotion) s += VAL[m.promotion];
+    if (priority && sameMove(m, priority)) s += 1_000_000;
+    return { m, s };
+  });
+  scored.sort((a, b) => b.s - a.s);
+  return scored.map((x) => x.m);
 }
 
 export type AILevel = "easy" | "medium" | "hard";
 
+// Time budgets per difficulty — the search runs iterative-deepening until it
+// either finishes the cap depth or exceeds the budget, whichever comes first.
+const TIME_BUDGET_MS: Record<AILevel, number> = { easy: 0, medium: 700, hard: 1600 };
+const MAX_DEPTH: Record<AILevel, number> = { easy: 1, medium: 4, hard: 6 };
+
 export function pickAIMove(game: DrawbackGame, level: AILevel): Move | null {
   const all = legalMoves(game);
   if (!all.length) return null;
-  // Prefer non-self-losing moves, but fall back to anything legal if all moves lose.
   const safe = all.filter((m) => !isSelfLosing(game, m));
   const moves = safe.length ? safe : all;
+
   if (level === "easy") {
-    // captures preferred, else random
     const caps = moves.filter((m) => m.captured);
     const pool = caps.length ? caps : moves;
     return pool[Math.floor(Math.random() * pool.length)];
   }
-  const depth = level === "hard" ? 3 : 2;
+
   const me = game.board.turn;
-  let bestScore = -Infinity;
-  let best: Move | null = null;
-  for (const m of moves) {
-    const nb = makeMove(game.board, m);
-    const score = -negamax(nb, depth - 1, -Infinity, Infinity, me === "w" ? "b" : "w", me);
-    if (score > bestScore) {
-      bestScore = score;
-      best = m;
+  const opp: Color = me === "w" ? "b" : "w";
+  const budget = TIME_BUDGET_MS[level];
+  const maxDepth = MAX_DEPTH[level];
+  const start = Date.now();
+
+  let bestMove: Move | null = null;
+
+  // Iterative deepening: search depth 1, 2, 3, ... up to maxDepth. The best move
+  // from each completed depth is the first one tried at the next depth, which
+  // dramatically improves alpha-beta cutoffs.
+  for (let d = 1; d <= maxDepth; d++) {
+    let depthBest: Move | null = null;
+    let depthBestScore = -Infinity;
+    let alpha = -Infinity;
+    const beta = Infinity;
+    let timedOut = false;
+
+    for (const m of orderMoves(moves, bestMove)) {
+      const nb = makeMove(game.board, m);
+      const score = -negamax(nb, d - 1, -beta, -alpha, opp, me, start, budget);
+      if (score === TIMEOUT_SENTINEL) {
+        timedOut = true;
+        break;
+      }
+      if (score > depthBestScore) {
+        depthBestScore = score;
+        depthBest = m;
+      }
+      if (score > alpha) alpha = score;
     }
+
+    if (!timedOut && depthBest) bestMove = depthBest;
+
+    // After depth 1 has run, respect the time budget.
+    if (d >= 1 && Date.now() - start > budget) break;
   }
-  return best ?? moves[0];
+
+  return bestMove ?? moves[0];
 }
 
-function negamax(board: BoardState, depth: number, alpha: number, beta: number, side: Color, root: Color): number {
-  // king-capture terminal
+const TIMEOUT_SENTINEL = Number.NEGATIVE_INFINITY + 1;
+
+function negamax(
+  board: BoardState,
+  depth: number,
+  alpha: number,
+  beta: number,
+  side: Color,
+  root: Color,
+  start: number,
+  budget: number,
+): number {
+  if (budget > 0 && Date.now() - start > budget * 2) return TIMEOUT_SENTINEL;
+
   const wk = findKing(board, "w");
   const bk = findKing(board, "b");
-  if (!wk) return side === root ? -100000 : 100000; // white king gone → white loses
+  if (!wk) return side === root ? -100000 : 100000;
   if (!bk) return side === root ? 100000 : -100000;
-  if (depth === 0) return evaluate(board, side);
-  // No drawback filtering here (cost-prohibitive); just chess moves
-  const moves = generateMoves(board);
-  // Prefer captures first for ordering
-  moves.sort((a, b) => (b.captured ? VAL[b.captured] : 0) - (a.captured ? VAL[a.captured] : 0));
+  if (depth === 0) return quiesce(board, alpha, beta, side, 6);
+
+  const moves = orderMoves(generateMoves(board));
+  const opp: Color = side === "w" ? "b" : "w";
   let best = -Infinity;
   for (const m of moves) {
     const nb = makeMove(board, m);
-    const v = -negamax(nb, depth - 1, -beta, -alpha, side === "w" ? "b" : "w", root);
+    const v = -negamax(nb, depth - 1, -beta, -alpha, opp, root, start, budget);
+    if (v === -TIMEOUT_SENTINEL) return TIMEOUT_SENTINEL;
     if (v > best) best = v;
     if (best > alpha) alpha = best;
     if (alpha >= beta) break;
   }
   if (best === -Infinity) return evaluate(board, side);
   return best;
+}
+
+// Quiescence search: only consider captures so the leaf eval isn't called on a
+// position where the side to move can immediately win/lose major material.
+function quiesce(
+  board: BoardState,
+  alpha: number,
+  beta: number,
+  side: Color,
+  depth: number,
+): number {
+  const wk = findKing(board, "w");
+  const bk = findKing(board, "b");
+  if (!wk) return side === "w" ? -100000 : 100000;
+  if (!bk) return side === "b" ? -100000 : 100000;
+
+  const standPat = evaluate(board, side);
+  if (standPat >= beta) return beta;
+  if (alpha < standPat) alpha = standPat;
+  if (depth === 0) return alpha;
+
+  const captures = orderMoves(generateMoves(board).filter((m) => m.captured));
+  const opp: Color = side === "w" ? "b" : "w";
+  for (const m of captures) {
+    const nb = makeMove(board, m);
+    const score = -quiesce(nb, -beta, -alpha, opp, depth - 1);
+    if (score >= beta) return beta;
+    if (score > alpha) alpha = score;
+  }
+  return alpha;
 }

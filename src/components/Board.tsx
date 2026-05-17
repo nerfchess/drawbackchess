@@ -18,6 +18,12 @@ export interface QueuedPremove {
   from: Square;
   to: Square;
   promotion?: PieceType;
+  // True if the user picked a square that had a piece (opponent OR friendly).
+  // The premove only fires if the matching legal move when our turn comes is
+  // also a capture. A planned Nxe5 won't silently downgrade to a quiet Ne5
+  // when the e5 target ran away, and a friendly-target premove fires only if
+  // the opponent captures our piece first.
+  capture?: boolean;
 }
 
 interface Props {
@@ -30,7 +36,7 @@ interface Props {
   disabled?: boolean;
   lastMove?: Move | null;
   premoveMode?: boolean;
-  premove?: QueuedPremove | null;
+  premoves?: QueuedPremove[];
   onCancelPremove?: () => void;
 }
 
@@ -55,9 +61,17 @@ export function Board({
   disabled,
   lastMove,
   premoveMode = false,
-  premove,
+  premoves,
   onCancelPremove,
 }: Props) {
+  const premoveSquares = useMemo(() => {
+    const s = new Set<Square>();
+    for (const pm of premoves ?? []) {
+      s.add(pm.from);
+      s.add(pm.to);
+    }
+    return s;
+  }, [premoves]);
   const [selected, setSelected] = useState<Square | null>(null);
   const [promotionMove, setPromotionMove] = useState<Move[] | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
@@ -261,8 +275,8 @@ export function Board({
   const draggedPiece = drag ? board.pieces[drag.from] : null;
 
   const handleContextMenu = (e: React.MouseEvent) => {
-    // right-click cancels the queued premove (chess.com convention)
-    if (premove && onCancelPremove) {
+    // right-click cancels the whole premove queue (chess.com convention)
+    if (premoves && premoves.length > 0 && onCancelPremove) {
       e.preventDefault();
       onCancelPremove();
       setSelected(null);
@@ -296,8 +310,7 @@ export function Board({
             const isHover = hoverSq === sq && drag != null;
             const isDragging = drag?.from === sq;
             const isForced = visual?.highlightSquares?.includes(sq);
-            const isPremoveFrom = premove?.from === sq;
-            const isPremoveTo = premove?.to === sq;
+            const isPremoveSquare = premoveSquares.has(sq);
 
             const fogHide =
               !!visual?.fogged && piece && piece.color !== myColor && !lastTo;
@@ -355,7 +368,7 @@ export function Board({
                 {isCastleHint && (
                   <div className="absolute inset-0 pointer-events-none ring-2 ring-inset ring-gold/70 rounded-sm" />
                 )}
-                {(isPremoveFrom || isPremoveTo) && (
+                {isPremoveSquare && (
                   <div className="absolute inset-0 pointer-events-none bg-oxblood/45" />
                 )}
 
