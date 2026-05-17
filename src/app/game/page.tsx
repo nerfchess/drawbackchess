@@ -180,7 +180,7 @@ function GamePage() {
     if (game.board.turn === myColor) return;
     if (aiThinking.current) return;
     aiThinking.current = true;
-    const delay = difficulty === "easy" ? 120 : difficulty === "medium" ? 200 : 320;
+    const delay = difficulty === "easy" ? 450 : difficulty === "medium" ? 800 : 1200;
     const tid = setTimeout(() => {
       const m = pickAIMove(game, difficulty);
       if (m) {
