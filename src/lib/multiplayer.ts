@@ -187,9 +187,9 @@ export class MPSession {
     }
   }
 
-  async host(): Promise<string> {
+  async host(presetCode?: string): Promise<string> {
     this.isHost = true;
-    const code = randomCode();
+    const code = (presetCode && presetCode.trim().toUpperCase()) || randomCode();
     try {
       await this.openChannel(code);
       this.emit({ type: "open", code });

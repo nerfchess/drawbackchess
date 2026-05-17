@@ -5,23 +5,21 @@ import { DrawbackCard } from "@/components/DrawbackCard";
 import { GameOver } from "@/components/GameOver";
 import { MoveList } from "@/components/MoveList";
 import { AILevel, pickAIMove } from "@/engine/ai";
-import { Drawback, DrawbackState, GameContext } from "@/engine/drawback";
+import { Drawback } from "@/engine/drawback";
 import { IMPLEMENTED_BY_ID, PLAYABLE_DRAWBACKS } from "@/engine/drawbacks/library";
 import {
-  applyTurnStart,
   currentHint,
   DrawbackGame,
-  legalMoves,
   makeContext,
   newGame,
   playMove,
   resign,
 } from "@/engine/game";
 import { makeSeed } from "@/engine/rng";
-import { BoardState, Color, Move } from "@/engine/types";
-import { cloneBoard, generateMoves, isInCheck, makeMove } from "@/engine/board";
-import type { QueuedPremove } from "@/components/Board";
+import { Color, Move } from "@/engine/types";
+import { isInCheck } from "@/engine/board";
 import { buildCustomDrawback, CustomDrawback } from "@/engine/drawbacks/custom";
+import { usePremoves } from "@/lib/premoves";
 import { isMuted, playCapture, playCheck, playDrawback, playMove as playMoveSfx, setMuted } from "@/lib/sounds";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
@@ -42,44 +40,6 @@ function formatClock(ms: number): string {
 function pickRandomDrawback(): Drawback {
   const playable = PLAYABLE_DRAWBACKS.filter((d) => d.id !== "lucky");
   return playable[Math.floor(Math.random() * playable.length)];
-}
-
-// Pseudo-legal premove options on a (turn-flipped) board. The active drawback's
-// filterMoves is applied to the base move list so drawback-illegal premoves
-// aren't queueable. On top of that we synthesize "friendly-target" moves —
-// moves that would land on one of our own non-king pieces — so the user can
-// premove anticipating an opponent capture. These synthetics aren't passed
-// through the drawback filter at queue-time; the real legal-move list at
-// execute-time decides whether they actually play.
-function premoveOptionsFor(
-  board: BoardState,
-  me: Color,
-  drawback: Drawback | null,
-  drawbackState: DrawbackState | null,
-  ctx: GameContext | null,
-): Move[] {
-  const base = generateMoves(board);
-  let filtered: Move[] = base;
-  if (drawback?.filterMoves && drawbackState && ctx) {
-    try {
-      filtered = drawback.filterMoves(base, drawbackState, ctx);
-    } catch {
-      filtered = base;
-    }
-  }
-  const extras: Move[] = [];
-  for (let sq = 0; sq < 64; sq++) {
-    const p = board.pieces[sq];
-    if (!p || p.color !== me || p.type === "k") continue;
-    const tmp = cloneBoard(board);
-    tmp.pieces[sq] = null;
-    const all = generateMoves(tmp);
-    for (const m of all) {
-      if (m.to !== sq) continue;
-      extras.push({ ...m, captured: p.type });
-    }
-  }
-  return [...filtered, ...extras];
 }
 
 export default function GamePageWrapper() {
@@ -129,7 +89,6 @@ function GamePage() {
   const [game, setGame] = useState<DrawbackGame | null>(null);
   const [, force] = useState(0);
   const [muted, setMutedState] = useState(false);
-  const [premoves, setPremoves] = useState<QueuedPremove[]>([]);
   const [confirmingResign, setConfirmingResign] = useState(false);
   const [drawOfferStatus, setDrawOfferStatus] = useState<"idle" | "offering" | "declined">("idle");
   const [whiteMs, setWhiteMs] = useState(initialTimeMs);
@@ -162,76 +121,22 @@ function GamePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const moves = useMemo(() => (game ? legalMoves(game) : []), [game]);
+  const applyMyMove = (m: Move) => {
+    if (!game || game.result) return;
+    const next = playMove(game, m);
+    setGame({ ...next });
+  };
 
-  // Build a "virtual" board that reflects the current actual board with every
-  // queued premove applied in sequence. Pseudo-legal options for further
-  // premoves are generated against this virtual board, so chained premoves
-  // (move A then move B with A already applied) work naturally.
-  //
-  // We also synthesize "friendly-target" moves: moves that would land on one
-  // of our own pieces. The user can premove these in anticipation of the
-  // opponent capturing first; at execute time, if the friendly piece is still
-  // there the real legal-move list won't include the move and the premove is
-  // discarded.
-  const myDrawbackForPremove = game ? (myColor === "w" ? game.white.drawback : game.black.drawback) : null;
-  const myStateForPremove = game ? (myColor === "w" ? game.white.state : game.black.state) : null;
-
-  const { virtualBoard, validPremoves } = useMemo(() => {
-    if (!game || game.result || game.board.turn === myColor) {
-      return { virtualBoard: null as BoardState | null, validPremoves: [] as QueuedPremove[] };
-    }
-    let board = cloneBoard(game.board);
-    board.turn = myColor;
-    board.epTarget = null;
-    const valid: QueuedPremove[] = [];
-    for (const pm of premoves) {
-      const ctx: GameContext = {
-        board,
-        me: myColor,
-        opponentLastMove: [...board.history].reverse().find((m) => m.color !== myColor) ?? null,
-        myLastMove: [...board.history].reverse().find((m) => m.color === myColor) ?? null,
-        moveNumber: board.history.filter((m) => m.color === myColor).length,
-        capturedByMe: game.captured[myColor],
-        capturedFromMe: game.captured[myColor === "w" ? "b" : "w"],
-      };
-      const options = premoveOptionsFor(board, myColor, myDrawbackForPremove, myStateForPremove, ctx);
-      const match = options.find(
-        (c) =>
-          c.from === pm.from &&
-          c.to === pm.to &&
-          (c.promotion ?? undefined) === (pm.promotion ?? undefined) &&
-          (!pm.capture || !!c.captured),
-      );
-      if (!match) break;
-      board = makeMove(board, match);
-      board.turn = myColor;
-      board.epTarget = null;
-      valid.push(pm);
-    }
-    return { virtualBoard: board, validPremoves: valid };
-  }, [game, myColor, premoves, myDrawbackForPremove, myStateForPremove]);
-
-  const premoveOptions = useMemo<Move[]>(() => {
-    if (!virtualBoard || !game) return [];
-    const ctx: GameContext = {
-      board: virtualBoard,
-      me: myColor,
-      opponentLastMove: [...virtualBoard.history].reverse().find((m) => m.color !== myColor) ?? null,
-      myLastMove: [...virtualBoard.history].reverse().find((m) => m.color === myColor) ?? null,
-      moveNumber: virtualBoard.history.filter((m) => m.color === myColor).length,
-      capturedByMe: game.captured[myColor],
-      capturedFromMe: game.captured[myColor === "w" ? "b" : "w"],
-    };
-    return premoveOptionsFor(virtualBoard, myColor, myDrawbackForPremove, myStateForPremove, ctx);
-  }, [virtualBoard, myColor, game, myDrawbackForPremove, myStateForPremove]);
-
-  // The board is in true premove mode only when it's the opponent's turn. When
-  // it's our turn and premoves are still pending, the head is about to commit;
-  // we keep showing the virtual board so the piece doesn't flicker back to its
-  // original square between the AI move landing and our queued move firing.
-  const premoveMode = !!game && !game.result && game.board.turn !== myColor && !!virtualBoard;
-  const premovePending = !!game && !game.result && game.board.turn === myColor && premoves.length > 0;
+  const {
+    queue: queuePremove,
+    clear: clearPremoves,
+    moves,
+    virtualBoard,
+    validPremoves,
+    premoveOptions,
+    premoveMode,
+    premovePending,
+  } = usePremoves(game, myColor, applyMyMove);
 
   // Played-move sound effects: react to history change.
   const lastSeenMoveCount = useRef(0);
@@ -260,38 +165,6 @@ function GamePage() {
       playDrawback();
     }
   }, [game?.result]);
-
-  // Execute the head of the premove queue when our turn returns. If the head
-  // is no longer playable (target ran away, piece pinned, friendly target
-  // still standing) we clear the whole queue — subsequent links assumed the
-  // head would land, so they can't be salvaged.
-  useEffect(() => {
-    if (premoves.length === 0 || !game || game.result) return;
-    if (game.board.turn !== myColor) return;
-    const head = premoves[0];
-    const m = moves.find(
-      (lm) =>
-        lm.from === head.from &&
-        lm.to === head.to &&
-        (lm.promotion ?? undefined) === (head.promotion ?? undefined) &&
-        // If the user premoved a capture (real or friendly-target), the
-        // matching legal move must also be a capture — otherwise a planned
-        // Nxe5 silently downgrades to a quiet Ne5 when the target ran away,
-        // and a friendly-target premove fires only when the opponent
-        // actually took our piece.
-        (!head.capture || !!lm.captured),
-    );
-    if (!m) {
-      setPremoves([]);
-      return;
-    }
-    const tid = setTimeout(() => {
-      const next = playMove(game, m);
-      setGame({ ...next });
-      setPremoves((q) => q.slice(1));
-    }, 90);
-    return () => clearTimeout(tid);
-  }, [game, premoves, moves, myColor]);
 
   // Clock tick — decrement the active side's clock at 100ms intervals while the
   // game is live. The actual loss check is in a separate effect so we don't
@@ -362,19 +235,14 @@ function GamePage() {
   const handleMove = (m: Move) => {
     if (game.result) return;
     if (game.board.turn !== myColor) {
-      // append to the premove queue; chained premoves are evaluated against
-      // the virtual board derived from any prior queued moves
-      setPremoves((q) => [
-        ...q,
-        { from: m.from, to: m.to, promotion: m.promotion, capture: !!m.captured },
-      ]);
+      queuePremove(m);
       return;
     }
     const next = playMove(game, m);
     setGame({ ...next });
   };
 
-  const cancelPremove = () => setPremoves([]);
+  const cancelPremove = clearPremoves;
 
   const handleRematch = () => router.push("/play");
 
@@ -382,7 +250,7 @@ function GamePage() {
     if (!game.result) {
       resign(game, myColor);
       setGame({ ...game });
-      setPremoves([]);
+      clearPremoves();
     }
   };
 
@@ -404,7 +272,7 @@ function GamePage() {
       if (aiAhead <= 2) {
         game.result = { winner: "draw", reason: "draw by agreement" };
         setGame({ ...game });
-        setPremoves([]);
+        clearPremoves();
         setDrawOfferStatus("idle");
       } else {
         setDrawOfferStatus("declined");

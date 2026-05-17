@@ -1,8 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
-import { Board, QueuedPremove } from "@/components/Board";
+import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Board } from "@/components/Board";
 import { DrawbackCard } from "@/components/DrawbackCard";
 import { GameOver } from "@/components/GameOver";
 import { MoveList } from "@/components/MoveList";
@@ -17,6 +18,7 @@ import {
 import { makeSeed } from "@/engine/rng";
 import { Color, Move } from "@/engine/types";
 import { MPMessage, MPSession, SUPABASE_CONFIGURED } from "@/lib/multiplayer";
+import { usePremoves } from "@/lib/premoves";
 import { isMuted, playCapture, playCheck, playMove as playMoveSfx, setMuted } from "@/lib/sounds";
 
 type View = "setup" | "lobby" | "joining" | "game";
@@ -35,7 +37,16 @@ function formatClock(ms: number): string {
   return `${m}:${s.toString().padStart(2, "0")}`;
 }
 
-export default function FriendPage() {
+export default function FriendPageWrapper() {
+  return (
+    <Suspense fallback={null}>
+      <FriendPage />
+    </Suspense>
+  );
+}
+
+function FriendPage() {
+  const searchParams = useSearchParams();
   const [view, setView] = useState<View>("setup");
   const [code, setCode] = useState("");
   const [joinCode, setJoinCode] = useState("");
@@ -47,7 +58,6 @@ export default function FriendPage() {
   const [myColor, setMyColor] = useState<Color>("w");
   const [whiteMs, setWhiteMs] = useState(0);
   const [blackMs, setBlackMs] = useState(0);
-  const [premoves, setPremoves] = useState<QueuedPremove[]>([]);
 
   const sessionRef = useRef<MPSession | null>(null);
   const clockEnabledRef = useRef(false);
@@ -55,17 +65,27 @@ export default function FriendPage() {
 
   useEffect(() => setMutedState(isMuted()), []);
 
-  // If the page was opened with ?code=XXXXX, auto-fill and join.
+  // If opened with ?code=XXXXX, auto-join. If also `host=1` (challenge-host),
+  // auto-create with the provided time control. Plain `?code=XXXXX&t=600`
+  // (challenge guest) auto-joins.
   useEffect(() => {
     if (typeof window === "undefined") return;
-    const params = new URLSearchParams(window.location.search);
-    const c = params.get("code");
+    const c = searchParams.get("code");
+    const isHost = searchParams.get("host") === "1";
+    const tParam = searchParams.get("t");
+    if (tParam) {
+      const t = parseInt(tParam, 10);
+      if (Number.isFinite(t) && t >= 0) setTimeSec(t);
+    }
     if (!c) return;
     const clean = c.trim().toUpperCase().slice(0, 6);
     if (!clean) return;
-    setJoinCode(clean);
-    // Defer to next tick so handleJoin sees the latest joinCode.
-    setTimeout(() => handleJoinWith(clean), 0);
+    if (isHost) {
+      setTimeout(() => handleCreateWithCode(clean, tParam ? parseInt(tParam, 10) : timeSec), 0);
+    } else {
+      setJoinCode(clean);
+      setTimeout(() => handleJoinWith(clean), 0);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -153,25 +173,27 @@ export default function FriendPage() {
     });
   };
 
-  const handleCreate = async () => {
+  const handleCreate = async () => handleCreateWithCode(null, timeSec);
+
+  // If `presetCode` is given, host on that exact room code (used for the
+  // lobby-challenge flow where both sides know the code ahead of time).
+  // Otherwise the session generates a random one.
+  const handleCreateWithCode = async (presetCode: string | null, useTimeSec: number) => {
     setError(null);
     setCode("");
-    // Switch to the lobby immediately so the user sees something happening
-    // while PeerJS negotiates with the signaling server.
     setView("lobby");
     const sess = new MPSession();
     sessionRef.current = sess;
-    // Pre-generate game setup so it's ready when the guest joins.
     const init: Extract<MPMessage, { type: "init" }> = {
       type: "init",
       whiteDrawbackId: pickRandomDrawback().id,
       blackDrawbackId: pickRandomDrawback().id,
       seed: makeSeed(),
-      timeSec,
+      timeSec: useTimeSec,
     };
     wireSession(sess, "host", init);
     try {
-      const c = await sess.host();
+      const c = await sess.host(presetCode ?? undefined);
       setCode(c);
     } catch (e: any) {
       setError(String(e?.message || e) || "Could not create a game.");
@@ -200,55 +222,40 @@ export default function FriendPage() {
   };
   const handleJoin = () => handleJoinWith(joinCode);
 
-  const moves = useMemo(() => (game ? legalMoves(game) : []), [game]);
+  // Apply one of our own legal moves: update local state and send to peer.
+  const applyMyMove = (m: Move) => {
+    if (!game || game.result) return;
+    const next = playMove(game, m);
+    setGame({ ...next });
+    sessionRef.current?.send({ type: "move", move: m });
+    if (m.captured) playCapture();
+    else playMoveSfx();
+    if (isInCheck(next.board, next.board.turn)) setTimeout(playCheck, 80);
+  };
+
+  const {
+    queue: queuePremove,
+    clear: clearPremoves,
+    moves,
+    virtualBoard,
+    validPremoves,
+    premoveOptions,
+    premoveMode,
+    premovePending,
+  } = usePremoves(game, myColor, applyMyMove);
 
   const handleLocalMove = (m: Move) => {
     if (!game || game.result) return;
     if (game.board.turn !== myColor) {
-      setPremoves((q) => [
-        ...q,
-        { from: m.from, to: m.to, promotion: m.promotion, capture: !!m.captured },
-      ]);
+      queuePremove(m);
       return;
     }
     const lm = moves.find(
       (x) => x.from === m.from && x.to === m.to && (x.promotion ?? null) === (m.promotion ?? null),
     );
     if (!lm) return;
-    const next = playMove(game, lm);
-    setGame({ ...next });
-    sessionRef.current?.send({ type: "move", move: lm });
-    if (lm.captured) playCapture();
-    else playMoveSfx();
-    if (isInCheck(next.board, next.board.turn)) setTimeout(playCheck, 80);
+    applyMyMove(lm);
   };
-
-  // Execute queued premove when our turn comes
-  useEffect(() => {
-    if (!game || game.result || premoves.length === 0) return;
-    if (game.board.turn !== myColor) return;
-    const head = premoves[0];
-    const m = moves.find(
-      (lm) =>
-        lm.from === head.from &&
-        lm.to === head.to &&
-        (lm.promotion ?? undefined) === (head.promotion ?? undefined) &&
-        (!head.capture || !!lm.captured),
-    );
-    if (!m) {
-      setPremoves([]);
-      return;
-    }
-    const tid = setTimeout(() => {
-      const next = playMove(game, m);
-      setGame({ ...next });
-      setPremoves((q) => q.slice(1));
-      sessionRef.current?.send({ type: "move", move: m });
-      if (m.captured) playCapture();
-      else playMoveSfx();
-    }, 90);
-    return () => clearTimeout(tid);
-  }, [game, premoves, moves, myColor]);
 
   // Clock tick
   useEffect(() => {
@@ -285,7 +292,7 @@ export default function FriendPage() {
     sessionRef.current = null;
     initHandledRef.current = false;
     setGame(null);
-    setPremoves([]);
+    clearPremoves();
     setView("setup");
     setCode("");
     setJoinCode("");
@@ -470,16 +477,16 @@ export default function FriendPage() {
             />
           )}
           <Board
-            board={game.board}
-            legalMoves={game.board.turn === myColor ? moves : []}
+            board={virtualBoard ?? game.board}
+            legalMoves={game.board.turn === myColor && !premovePending ? moves : premoveOptions}
             orientation={myColor}
             onMove={handleLocalMove}
             myColor={myColor}
             lastMove={lastMove}
-            disabled={!!game.result}
-            premoveMode={game.board.turn !== myColor && !game.result}
-            premoves={premoves}
-            onCancelPremove={() => setPremoves([])}
+            disabled={!!game.result || premovePending}
+            premoveMode={premoveMode}
+            premoves={validPremoves}
+            onCancelPremove={clearPremoves}
           />
           {clockEnabledRef.current && (
             <ClockPill

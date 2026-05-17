@@ -33,8 +33,11 @@ export default function HomePage() {
             <Link href="/play" className="px-7 py-3 rounded-sm btn-leaf font-body text-base">
               Play now
             </Link>
+            <Link href="/lobby" className="px-7 py-3 rounded-sm btn-ghost font-body">
+              Lobby
+            </Link>
             <Link href="/friend" className="px-7 py-3 rounded-sm btn-ghost font-body">
-              Play a friend
+              By code
             </Link>
             <Link href="/codex" className="px-7 py-3 rounded-sm btn-ghost font-body">
               Browse the rules
@@ -109,6 +112,7 @@ function SiteNav() {
       </Link>
       <div className="flex gap-1 sm:gap-2 text-sm font-display">
         <Link href="/play" className="px-3 py-1.5 rounded-full hover:bg-white/5 text-parchment">Play</Link>
+        <Link href="/lobby" className="px-3 py-1.5 rounded-full hover:bg-white/5 text-parchment">Lobby</Link>
         <Link href="/codex" className="px-3 py-1.5 rounded-full hover:bg-white/5 text-parchment">Rules</Link>
         <Link href="/tutorial" className="px-3 py-1.5 rounded-full hover:bg-white/5 text-parchment">How to play</Link>
       </div>
