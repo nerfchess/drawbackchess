@@ -48,56 +48,113 @@ export class MPSession {
 
   async host(): Promise<string> {
     this.isHost = true;
-    const code = randomCode();
     const { default: Peer } = await import("peerjs");
-    this.peer = new Peer(ID_PREFIX + code);
-    this.code = code;
 
-    return new Promise((resolve, reject) => {
-      const onOpen = () => {
-        this.emit({ type: "open", code });
-        resolve(code);
-      };
-      this.peer.on("open", onOpen);
-      this.peer.on("error", (e: any) => {
-        const msg = String(e?.type || e?.message || e);
-        this.emit({ type: "error", message: msg });
-        if (!this.code) reject(e);
-      });
-      this.peer.on("connection", (c: any) => {
-        this.conn = c;
-        c.on("open", () => {
-          this.emit({ type: "guest-connected" });
+    // Try up to 5 codes — collisions on the free cloud are rare but possible.
+    let lastErr: any = null;
+    for (let attempt = 0; attempt < 5; attempt++) {
+      const code = randomCode();
+      try {
+        await new Promise<void>((resolve, reject) => {
+          let settled = false;
+          const peer = new Peer(ID_PREFIX + code, { debug: 1 });
+          this.peer = peer;
+          peer.on("open", () => {
+            if (settled) return;
+            settled = true;
+            this.code = code;
+            this.emit({ type: "open", code });
+            resolve();
+          });
+          peer.on("error", (e: any) => {
+            const msg = String(e?.type || e?.message || e);
+            console.error("[multiplayer] host peer error:", msg, e);
+            this.emit({ type: "error", message: msg });
+            if (!settled) {
+              settled = true;
+              reject(e);
+            }
+          });
+          peer.on("connection", (c: any) => {
+            this.conn = c;
+            c.on("open", () => {
+              this.emit({ type: "guest-connected" });
+            });
+            this.bindConn(c);
+          });
         });
-        this.bindConn(c);
-      });
-    });
+        return code; // success
+      } catch (e: any) {
+        lastErr = e;
+        // Only retry on "unavailable-id" (someone has that code). Other errors
+        // (network, browser-incompatible) bubble up immediately.
+        const type = e?.type || "";
+        if (type !== "unavailable-id") break;
+        try {
+          this.peer?.destroy();
+        } catch {}
+        this.peer = null;
+      }
+    }
+    throw lastErr ?? new Error("Could not create game");
   }
 
   async join(code: string): Promise<void> {
     this.isHost = false;
     this.code = code;
     const { default: Peer } = await import("peerjs");
-    this.peer = new Peer();
 
     return new Promise((resolve, reject) => {
-      this.peer.on("open", () => {
-        const c = this.peer.connect(ID_PREFIX + code, { reliable: true });
+      let settled = false;
+      const peer = new Peer(undefined as any, { debug: 1 });
+      this.peer = peer;
+
+      // Safety timeout — public PeerJS sometimes silently fails on bad
+      // codes (host disconnected, code never existed). After 8 seconds
+      // surface a "couldn't reach host" error instead of hanging.
+      const timeout = setTimeout(() => {
+        if (settled) return;
+        settled = true;
+        const msg = `No response — check the code, or have your friend re-create the game.`;
+        console.error("[multiplayer] join timeout for code:", code);
+        this.emit({ type: "error", message: msg });
+        reject(new Error(msg));
+      }, 8000);
+
+      peer.on("open", () => {
+        const c = peer.connect(ID_PREFIX + code, { reliable: true });
         this.conn = c;
         c.on("open", () => {
+          if (settled) return;
+          settled = true;
+          clearTimeout(timeout);
           this.emit({ type: "host-ready" });
           resolve();
         });
         c.on("error", (e: any) => {
+          console.error("[multiplayer] join conn error:", e);
           this.emit({ type: "error", message: String(e?.message || e) });
-          reject(e);
+          if (!settled) {
+            settled = true;
+            clearTimeout(timeout);
+            reject(e);
+          }
         });
         this.bindConn(c);
       });
-      this.peer.on("error", (e: any) => {
+      peer.on("error", (e: any) => {
         const msg = String(e?.type || e?.message || e);
-        this.emit({ type: "error", message: msg });
-        reject(e);
+        console.error("[multiplayer] join peer error:", msg, e);
+        let friendly = msg;
+        if (e?.type === "peer-unavailable") {
+          friendly = "That code isn't active. Ask your friend to re-create the game.";
+        }
+        this.emit({ type: "error", message: friendly });
+        if (!settled) {
+          settled = true;
+          clearTimeout(timeout);
+          reject(new Error(friendly));
+        }
       });
     });
   }
