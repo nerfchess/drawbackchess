@@ -68,7 +68,23 @@ export async function joinLobby(opts: LobbyOptions): Promise<LobbyHandle> {
   const { identity, initialTimeSec, onPlayers, onMessage, onStatus } = opts;
   onStatus?.("connecting");
 
-  const channel = client().channel(LOBBY_CHANNEL, {
+  const c = client();
+  // Supabase caches channels by topic. If a previous joinLobby created one
+  // (e.g. on rename re-mount, or React effect re-run after navigation), the
+  // cached channel is already subscribed and we can't attach new presence
+  // listeners. Tear it down first so we start fresh.
+  try {
+    for (const existing of c.getChannels?.() ?? []) {
+      const topic: string = existing?.topic ?? "";
+      if (topic === LOBBY_CHANNEL || topic.endsWith(":" + LOBBY_CHANNEL)) {
+        await c.removeChannel(existing);
+      }
+    }
+  } catch (e) {
+    console.warn("[lobby] cleanup of stale channels failed:", e);
+  }
+
+  const channel = c.channel(LOBBY_CHANNEL, {
     config: {
       presence: { key: identity.id },
       broadcast: { self: false, ack: false },
