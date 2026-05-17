@@ -15,9 +15,10 @@ interface Props {
   blackDrawback: Drawback;
   myColor: Color;
   onRematch: () => void;
+  onClose?: () => void;
 }
 
-export function GameOver({ result, whiteDrawback, blackDrawback, myColor, onRematch }: Props) {
+export function GameOver({ result, whiteDrawback, blackDrawback, myColor, onRematch, onClose }: Props) {
   const won = result.winner === myColor;
   const draw = result.winner === "draw";
   const headline = draw ? "Draw" : won ? "You win!" : "You lose";
@@ -39,6 +40,18 @@ export function GameOver({ result, whiteDrawback, blackDrawback, myColor, onRema
         transition={{ type: "spring", damping: 22 }}
         className="plate gilt p-6 sm:p-10 max-w-3xl w-full relative overflow-hidden"
       >
+        {onClose && (
+          <button
+            onClick={onClose}
+            aria-label="Close"
+            className="absolute top-3 right-3 z-10 w-9 h-9 inline-flex items-center justify-center rounded-full btn-ghost hover:text-oxblood-glow transition"
+          >
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <line x1="6" y1="6" x2="18" y2="18" />
+              <line x1="6" y1="18" x2="18" y2="6" />
+            </svg>
+          </button>
+        )}
         <div className="absolute -top-24 -right-24 w-72 h-72 sigil opacity-30 animate-sigil pointer-events-none" />
         <div className="absolute -bottom-32 -left-24 w-72 h-72 sigil opacity-20 animate-sigil pointer-events-none" style={{ animationDirection: "reverse" }} />
 

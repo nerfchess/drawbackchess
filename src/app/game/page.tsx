@@ -19,7 +19,7 @@ import {
 } from "@/engine/game";
 import { makeSeed } from "@/engine/rng";
 import { BoardState, Color, Move } from "@/engine/types";
-import { cloneBoard, generateMoves, isInCheck, makeMove } from "@/engine/board";
+import { cloneBoard, generateMoves, initialBoard, isInCheck, makeMove } from "@/engine/board";
 import type { QueuedPremove } from "@/components/Board";
 import { buildCustomDrawback, CustomDrawback } from "@/engine/drawbacks/custom";
 import { isMuted, playCapture, playCheck, playDrawback, playMove as playMoveSfx, setMuted } from "@/lib/sounds";
@@ -32,11 +32,13 @@ function pickRandomDrawback(): Drawback {
   return playable[Math.floor(Math.random() * playable.length)];
 }
 
-// Pseudo-legal premove options on a (turn-flipped) board. Only moves to empty
-// squares or enemy squares are queueable; you can't premove a capture of your
-// own piece. The active drawback's filterMoves is also applied (best-effort
-// against the current drawback state) so you can't queue drawback-illegal
-// moves.
+// Pseudo-legal premove options on a (turn-flipped) board. Includes synthetic
+// "friendly-target" moves: a move that would land on one of your own pieces,
+// recorded as if it captures that piece. These let you queue a recapture in
+// anticipation of the opponent capturing your piece first; at real-turn
+// execute time, the move only fires if the destination is actually playable.
+// Base pseudo-legal moves are run through the active drawback's filterMoves so
+// you can't queue drawback-illegal moves.
 function premoveOptionsFor(
   board: BoardState,
   me: Color,
@@ -45,14 +47,29 @@ function premoveOptionsFor(
   ctx: GameContext | null,
 ): Move[] {
   const base = generateMoves(board);
-  if (drawback?.filterMoves && drawbackState && ctx) {
-    try {
-      return drawback.filterMoves(base, drawbackState, ctx);
-    } catch {
-      return base;
+  const filteredBase =
+    drawback?.filterMoves && drawbackState && ctx
+      ? (() => {
+          try {
+            return drawback.filterMoves!(base, drawbackState, ctx);
+          } catch {
+            return base;
+          }
+        })()
+      : base;
+  const extras: Move[] = [];
+  for (let sq = 0; sq < 64; sq++) {
+    const p = board.pieces[sq];
+    if (!p || p.color !== me || p.type === "k") continue;
+    const tmp = cloneBoard(board);
+    tmp.pieces[sq] = null;
+    const all = generateMoves(tmp);
+    for (const m of all) {
+      if (m.to !== sq) continue;
+      extras.push({ ...m, captured: p.type });
     }
   }
-  return base;
+  return [...filteredBase, ...extras];
 }
 
 export default function GamePageWrapper() {
@@ -99,6 +116,12 @@ function GamePage() {
   const [premoves, setPremoves] = useState<QueuedPremove[]>([]);
   const [confirmingResign, setConfirmingResign] = useState(false);
   const [drawOfferStatus, setDrawOfferStatus] = useState<"idle" | "offering" | "declined">("idle");
+  // null = viewing the live position; otherwise an index into board.history
+  // showing the position AFTER that move was played. The user navigates with
+  // arrow keys; live play (AI moves, premoves) resumes when they return to
+  // the live position.
+  const [viewIndex, setViewIndex] = useState<number | null>(null);
+  const [gameOverDismissed, setGameOverDismissed] = useState(false);
   const aiThinking = useRef(false);
 
   useEffect(() => {
@@ -128,6 +151,72 @@ function GamePage() {
   }, []);
 
   const moves = useMemo(() => (game ? legalMoves(game) : []), [game]);
+
+  // Reconstruct historical board by replaying moves from the initial position.
+  // The viewIndex points to the move after which we want to see the board;
+  // -1 means the starting position (before any move).
+  const viewedBoard = useMemo(() => {
+    if (!game || viewIndex === null) return null;
+    let b = initialBoard();
+    for (let i = 0; i <= viewIndex && i < game.board.history.length; i++) {
+      b = makeMove(b, game.board.history[i]);
+    }
+    return b;
+  }, [game, viewIndex]);
+
+  const isViewingHistory = viewIndex !== null;
+
+  // Snap back to live whenever new moves are appended past the current view.
+  // If the user is sitting on an old position, leave them there.
+  const lastHistLen = useRef(0);
+  useEffect(() => {
+    if (!game) return;
+    const len = game.board.history.length;
+    if (len < lastHistLen.current) {
+      // game reset
+      setViewIndex(null);
+    }
+    lastHistLen.current = len;
+  }, [game]);
+
+  // Reset the dismissed flag when a new game begins.
+  useEffect(() => {
+    setGameOverDismissed(false);
+  }, [game?.startedAt]);
+
+  // Arrow key navigation through history. Left/Right step by one ply, Home
+  // jumps to the start, End jumps back to live.
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!game) return;
+      const target = e.target as HTMLElement | null;
+      if (target && (target.tagName === "INPUT" || target.tagName === "TEXTAREA")) return;
+      const histLen = game.board.history.length;
+      if (histLen === 0) return;
+      if (e.key === "ArrowLeft") {
+        e.preventDefault();
+        setViewIndex((v) => {
+          if (v === null) return Math.max(-1, histLen - 2);
+          return Math.max(-1, v - 1);
+        });
+      } else if (e.key === "ArrowRight") {
+        e.preventDefault();
+        setViewIndex((v) => {
+          if (v === null) return null;
+          const next = v + 1;
+          return next >= histLen - 1 ? null : next;
+        });
+      } else if (e.key === "Home") {
+        e.preventDefault();
+        setViewIndex(-1);
+      } else if (e.key === "End" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setViewIndex(null);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [game]);
 
   // Build a "virtual" board that reflects the current actual board with every
   // queued premove applied in sequence. Pseudo-legal options for further
@@ -165,7 +254,8 @@ function GamePage() {
         (c) =>
           c.from === pm.from &&
           c.to === pm.to &&
-          (c.promotion ?? undefined) === (pm.promotion ?? undefined),
+          (c.promotion ?? undefined) === (pm.promotion ?? undefined) &&
+          (!pm.capture || !!c.captured),
       );
       if (!match) break;
       board = makeMove(board, match);
@@ -237,7 +327,8 @@ function GamePage() {
       (lm) =>
         lm.from === head.from &&
         lm.to === head.to &&
-        (lm.promotion ?? undefined) === (head.promotion ?? undefined),
+        (lm.promotion ?? undefined) === (head.promotion ?? undefined) &&
+        (!head.capture || !!lm.captured),
     );
     if (!m) {
       setPremoves([]);
@@ -455,18 +546,63 @@ function GamePage() {
             )}
           </div>
           <Board
-            board={virtualBoard ?? game.board}
-            legalMoves={game.board.turn === myColor && !premovePending ? moves : premoveOptions}
+            board={isViewingHistory ? viewedBoard! : (virtualBoard ?? game.board)}
+            legalMoves={isViewingHistory ? [] : (game.board.turn === myColor && !premovePending ? moves : premoveOptions)}
             orientation={myColor}
             onMove={handleMove}
             myColor={myColor}
-            visual={{ ...(visual ?? {}), highlightSquares: forcedSquares }}
-            lastMove={lastMove}
-            disabled={!!game.result || premovePending}
-            premoveMode={premoveMode}
-            premoves={validPremoves}
+            visual={isViewingHistory ? {} : { ...(visual ?? {}), highlightSquares: forcedSquares }}
+            lastMove={
+              isViewingHistory
+                ? (viewIndex !== null && viewIndex >= 0 ? game.board.history[viewIndex] : null)
+                : lastMove
+            }
+            disabled={!!game.result || premovePending || isViewingHistory}
+            premoveMode={!isViewingHistory && premoveMode}
+            premoves={isViewingHistory ? [] : validPremoves}
             onCancelPremove={cancelPremove}
           />
+          {isViewingHistory && (
+            <div className="flex items-center justify-between gap-2 px-1">
+              <span className="smallcaps text-[11px] text-parchment-300">
+                Viewing move {viewIndex === -1 ? "start" : `${viewIndex! + 1} / ${game.board.history.length}`}
+              </span>
+              <div className="flex gap-1">
+                <button
+                  onClick={() => setViewIndex(-1)}
+                  className="px-3 py-1 rounded-full btn-ghost text-[11px] font-display"
+                  aria-label="Jump to start"
+                >
+                  ⏮
+                </button>
+                <button
+                  onClick={() => setViewIndex((v) => Math.max(-1, (v ?? game.board.history.length) - 1))}
+                  className="px-3 py-1 rounded-full btn-ghost text-[11px] font-display"
+                  aria-label="Previous move"
+                >
+                  ◀
+                </button>
+                <button
+                  onClick={() => setViewIndex((v) => {
+                    if (v === null) return null;
+                    const next = v + 1;
+                    return next >= game.board.history.length - 1 ? null : next;
+                  })}
+                  className="px-3 py-1 rounded-full btn-ghost text-[11px] font-display"
+                  aria-label="Next move"
+                >
+                  ▶
+                </button>
+                <button
+                  onClick={() => setViewIndex(null)}
+                  className="px-3 py-1 rounded-full btn-leaf text-[11px] font-display"
+                  aria-label="Return to live"
+                >
+                  Live
+                </button>
+              </div>
+            </div>
+          )}
         </div>
         <aside className="space-y-4">
           <DrawbackCard drawback={myDrawback} />
@@ -475,13 +611,14 @@ function GamePage() {
         </aside>
       </div>
 
-      {game.result && (
+      {game.result && !gameOverDismissed && (
         <GameOver
           result={game.result}
           whiteDrawback={game.white.drawback}
           blackDrawback={game.black.drawback}
           myColor={myColor}
           onRematch={handleRematch}
+          onClose={() => setGameOverDismissed(true)}
         />
       )}
     </main>
