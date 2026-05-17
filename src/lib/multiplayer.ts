@@ -1,6 +1,12 @@
-// Thin wrapper around PeerJS for two-player chess over WebRTC. The free public
-// PeerJS signaling server handles peer discovery; once peers find each other
-// the data channel is direct browser-to-browser.
+// Two-player chess matchmaking over WebRTC. We use Trystero's Nostr strategy
+// for signaling — it talks to public Nostr relays, which are widely reachable
+// (we don't have to run our own server, and there's no central matchmaker
+// that can go down the way the free PeerJS cloud does).
+//
+// The Trystero "room" model is symmetric: both peers join a room keyed by the
+// 5-letter code and discover each other. We keep the host/guest distinction at
+// the app layer — the host generates the code and the initial game spec, the
+// guest joins with that code, and the host sends `init` once a peer appears.
 
 import type { Move } from "@/engine/types";
 
@@ -18,26 +24,8 @@ export type MPEvent =
   | { type: "disconnected" }
   | { type: "error"; message: string };
 
-const ID_PREFIX = "drawbackchess-v1-";
-
-// Explicit PeerJS config. The default is the free cloud at 0.peerjs.com:443
-// which is sometimes slow or blocked; pinning it plus extra STUN servers
-// makes connection more reliable across networks.
-const PEER_CONFIG = {
-  host: "0.peerjs.com",
-  secure: true,
-  port: 443,
-  debug: 1,
-  config: {
-    iceServers: [
-      { urls: "stun:stun.l.google.com:19302" },
-      { urls: "stun:stun1.l.google.com:19302" },
-      { urls: "stun:global.stun.twilio.com:3478" },
-    ],
-  },
-} as const;
-
-const OPEN_TIMEOUT_MS = 20000;
+const APP_ID = "drawbackchess-v1";
+const JOIN_TIMEOUT_MS = 25000;
 
 function randomCode(): string {
   // Avoid 0/O/1/I/L for readability.
@@ -48,8 +36,9 @@ function randomCode(): string {
 }
 
 export class MPSession {
-  private peer: any | null = null;
-  private conn: any | null = null;
+  private room: any | null = null;
+  private sendMsg: ((data: any, peers?: string | string[]) => Promise<any>) | null = null;
+  private peerIds: Set<string> = new Set();
   private listeners: Array<(e: MPEvent) => void> = [];
   isHost = false;
   code = "";
@@ -65,154 +54,96 @@ export class MPSession {
     for (const fn of [...this.listeners]) fn(e);
   }
 
+  private async openRoom(code: string): Promise<void> {
+    const { joinRoom } = await import("trystero/nostr");
+    const room = joinRoom({ appId: APP_ID }, code);
+    this.room = room;
+    const [sendMsg, getMsg] = room.makeAction("msg");
+    this.sendMsg = sendMsg;
+    getMsg((data: any) => {
+      this.emit({ type: "message", message: data as MPMessage });
+    });
+    room.onPeerJoin((peerId: string) => {
+      this.peerIds.add(peerId);
+      this.emit(this.isHost ? { type: "guest-connected" } : { type: "host-ready" });
+    });
+    room.onPeerLeave((peerId: string) => {
+      this.peerIds.delete(peerId);
+      this.emit({ type: "disconnected" });
+    });
+  }
+
   async host(): Promise<string> {
     this.isHost = true;
-    const { default: Peer } = await import("peerjs");
-
-    // Try up to 5 codes — collisions on the free cloud are rare but possible.
-    let lastErr: any = null;
-    for (let attempt = 0; attempt < 5; attempt++) {
-      const code = randomCode();
-      try {
-        await new Promise<void>((resolve, reject) => {
-          let settled = false;
-          const peer = new Peer(ID_PREFIX + code, PEER_CONFIG);
-          this.peer = peer;
-          // Safety timeout — if the signaling server never responds, fail fast
-          // so the UI can show an error instead of hanging silently.
-          const timeout = setTimeout(() => {
-            if (settled) return;
-            settled = true;
-            const msg = "Couldn't reach the matchmaking server. Check your connection and try again.";
-            console.error("[multiplayer] host open timeout for code:", code);
-            this.emit({ type: "error", message: msg });
-            try { peer.destroy(); } catch {}
-            reject(new Error(msg));
-          }, OPEN_TIMEOUT_MS);
-          peer.on("open", () => {
-            if (settled) return;
-            settled = true;
-            clearTimeout(timeout);
-            this.code = code;
-            this.emit({ type: "open", code });
-            resolve();
-          });
-          peer.on("error", (e: any) => {
-            const msg = String(e?.type || e?.message || e);
-            console.error("[multiplayer] host peer error:", msg, e);
-            this.emit({ type: "error", message: msg });
-            if (!settled) {
-              settled = true;
-              clearTimeout(timeout);
-              reject(e);
-            }
-          });
-          peer.on("connection", (c: any) => {
-            this.conn = c;
-            c.on("open", () => {
-              this.emit({ type: "guest-connected" });
-            });
-            this.bindConn(c);
-          });
-        });
-        return code; // success
-      } catch (e: any) {
-        lastErr = e;
-        // Only retry on "unavailable-id" (someone has that code). Other errors
-        // (network, browser-incompatible) bubble up immediately.
-        const type = e?.type || "";
-        if (type !== "unavailable-id") break;
-        try {
-          this.peer?.destroy();
-        } catch {}
-        this.peer = null;
-      }
+    const code = randomCode();
+    try {
+      await this.openRoom(code);
+      this.code = code;
+      this.emit({ type: "open", code });
+      return code;
+    } catch (e: any) {
+      const msg = String(e?.message || e) || "Could not create game.";
+      console.error("[multiplayer] host error:", e);
+      this.emit({ type: "error", message: msg });
+      throw new Error(msg);
     }
-    throw lastErr ?? new Error("Could not create game");
   }
 
   async join(code: string): Promise<void> {
     this.isHost = false;
     this.code = code;
-    const { default: Peer } = await import("peerjs");
-
-    return new Promise((resolve, reject) => {
+    try {
+      await this.openRoom(code);
+    } catch (e: any) {
+      const msg = String(e?.message || e) || "Could not join game.";
+      console.error("[multiplayer] join error:", e);
+      this.emit({ type: "error", message: msg });
+      throw new Error(msg);
+    }
+    // Wait for the host peer to appear, with a timeout so a bad code doesn't
+    // hang forever.
+    await new Promise<void>((resolve, reject) => {
+      if (this.peerIds.size > 0) {
+        resolve();
+        return;
+      }
       let settled = false;
-      const peer = new Peer(undefined as any, PEER_CONFIG);
-      this.peer = peer;
-
-      // Safety timeout — public PeerJS sometimes silently fails on bad
-      // codes (host disconnected, code never existed). Surface a
-      // "couldn't reach host" error instead of hanging.
       const timeout = setTimeout(() => {
         if (settled) return;
         settled = true;
-        const msg = `No response — check the code, or have your friend re-create the game.`;
-        console.error("[multiplayer] join timeout for code:", code);
+        const msg =
+          "No response — check the code, or have your friend re-create the game.";
+        console.error("[multiplayer] join wait timeout for code:", code);
         this.emit({ type: "error", message: msg });
         reject(new Error(msg));
-      }, OPEN_TIMEOUT_MS);
-
-      peer.on("open", () => {
-        const c = peer.connect(ID_PREFIX + code, { reliable: true });
-        this.conn = c;
-        c.on("open", () => {
-          if (settled) return;
+      }, JOIN_TIMEOUT_MS);
+      const unsub = this.on((e) => {
+        if (e.type === "host-ready" && !settled) {
           settled = true;
           clearTimeout(timeout);
-          this.emit({ type: "host-ready" });
+          unsub();
           resolve();
-        });
-        c.on("error", (e: any) => {
-          console.error("[multiplayer] join conn error:", e);
-          this.emit({ type: "error", message: String(e?.message || e) });
-          if (!settled) {
-            settled = true;
-            clearTimeout(timeout);
-            reject(e);
-          }
-        });
-        this.bindConn(c);
-      });
-      peer.on("error", (e: any) => {
-        const msg = String(e?.type || e?.message || e);
-        console.error("[multiplayer] join peer error:", msg, e);
-        let friendly = msg;
-        if (e?.type === "peer-unavailable") {
-          friendly = "That code isn't active. Ask your friend to re-create the game.";
-        }
-        this.emit({ type: "error", message: friendly });
-        if (!settled) {
-          settled = true;
-          clearTimeout(timeout);
-          reject(new Error(friendly));
         }
       });
-    });
-  }
-
-  private bindConn(c: any) {
-    c.on("data", (data: any) => {
-      this.emit({ type: "message", message: data as MPMessage });
-    });
-    c.on("close", () => {
-      this.emit({ type: "disconnected" });
     });
   }
 
   send(message: MPMessage) {
-    this.conn?.send(message);
+    if (!this.sendMsg) return;
+    try {
+      this.sendMsg(message as any);
+    } catch (e) {
+      console.error("[multiplayer] send error:", e);
+    }
   }
 
   destroy() {
     try {
-      this.conn?.close();
+      this.room?.leave();
     } catch {}
-    try {
-      this.peer?.destroy();
-    } catch {}
-    this.peer = null;
-    this.conn = null;
+    this.room = null;
+    this.sendMsg = null;
+    this.peerIds.clear();
     this.listeners = [];
   }
 }
