@@ -20,6 +20,25 @@ export type MPEvent =
 
 const ID_PREFIX = "drawbackchess-v1-";
 
+// Explicit PeerJS config. The default is the free cloud at 0.peerjs.com:443
+// which is sometimes slow or blocked; pinning it plus extra STUN servers
+// makes connection more reliable across networks.
+const PEER_CONFIG = {
+  host: "0.peerjs.com",
+  secure: true,
+  port: 443,
+  debug: 1,
+  config: {
+    iceServers: [
+      { urls: "stun:stun.l.google.com:19302" },
+      { urls: "stun:stun1.l.google.com:19302" },
+      { urls: "stun:global.stun.twilio.com:3478" },
+    ],
+  },
+} as const;
+
+const OPEN_TIMEOUT_MS = 20000;
+
 function randomCode(): string {
   // Avoid 0/O/1/I/L for readability.
   const chars = "BCDFGHJKMNPQRSTVWXYZ23456789";
@@ -57,7 +76,7 @@ export class MPSession {
       try {
         await new Promise<void>((resolve, reject) => {
           let settled = false;
-          const peer = new Peer(ID_PREFIX + code, { debug: 1 });
+          const peer = new Peer(ID_PREFIX + code, PEER_CONFIG);
           this.peer = peer;
           // Safety timeout — if the signaling server never responds, fail fast
           // so the UI can show an error instead of hanging silently.
@@ -69,7 +88,7 @@ export class MPSession {
             this.emit({ type: "error", message: msg });
             try { peer.destroy(); } catch {}
             reject(new Error(msg));
-          }, 8000);
+          }, OPEN_TIMEOUT_MS);
           peer.on("open", () => {
             if (settled) return;
             settled = true;
@@ -119,12 +138,12 @@ export class MPSession {
 
     return new Promise((resolve, reject) => {
       let settled = false;
-      const peer = new Peer(undefined as any, { debug: 1 });
+      const peer = new Peer(undefined as any, PEER_CONFIG);
       this.peer = peer;
 
       // Safety timeout — public PeerJS sometimes silently fails on bad
-      // codes (host disconnected, code never existed). After 8 seconds
-      // surface a "couldn't reach host" error instead of hanging.
+      // codes (host disconnected, code never existed). Surface a
+      // "couldn't reach host" error instead of hanging.
       const timeout = setTimeout(() => {
         if (settled) return;
         settled = true;
@@ -132,7 +151,7 @@ export class MPSession {
         console.error("[multiplayer] join timeout for code:", code);
         this.emit({ type: "error", message: msg });
         reject(new Error(msg));
-      }, 8000);
+      }, OPEN_TIMEOUT_MS);
 
       peer.on("open", () => {
         const c = peer.connect(ID_PREFIX + code, { reliable: true });
