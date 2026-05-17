@@ -55,6 +55,20 @@ export default function FriendPage() {
 
   useEffect(() => setMutedState(isMuted()), []);
 
+  // If the page was opened with ?code=XXXXX, auto-fill and join.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const params = new URLSearchParams(window.location.search);
+    const c = params.get("code");
+    if (!c) return;
+    const clean = c.trim().toUpperCase().slice(0, 6);
+    if (!clean) return;
+    setJoinCode(clean);
+    // Defer to next tick so handleJoin sees the latest joinCode.
+    setTimeout(() => handleJoinWith(clean), 0);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   // Outgoing move signal — when the local game gets a move from our side, send
   // it to the peer. We dedupe by move count: only send moves we just played.
   const lastSentCount = useRef(0);
@@ -165,9 +179,9 @@ export default function FriendPage() {
     }
   };
 
-  const handleJoin = async () => {
+  const handleJoinWith = async (rawCode: string) => {
     setError(null);
-    const trimmed = joinCode.trim().toUpperCase();
+    const trimmed = rawCode.trim().toUpperCase();
     if (!trimmed) {
       setError("Enter a code.");
       return;
@@ -184,6 +198,7 @@ export default function FriendPage() {
       setView("setup");
     }
   };
+  const handleJoin = () => handleJoinWith(joinCode);
 
   const moves = useMemo(() => (game ? legalMoves(game) : []), [game]);
 
@@ -372,9 +387,10 @@ export default function FriendPage() {
           </div>
           <p className="mt-6 text-parchment-200">
             {code
-              ? "Send the code to your friend. They open this page and tap “Join”."
+              ? "Send the code to your friend — or just send them this link:"
               : "Setting up a private room. This usually takes a couple of seconds."}
           </p>
+          {code && <ShareLink code={code} />}
           <div className="mt-8 flex items-center justify-center gap-2 smallcaps text-[11px] text-parchment-400">
             <span className="w-1.5 h-1.5 rounded-full bg-verdigris animate-flicker" />
             {code ? "Waiting for opponent…" : "Connecting to matchmaker…"}
@@ -493,6 +509,37 @@ function SiteNav() {
         vs Bot
       </Link>
     </nav>
+  );
+}
+
+function ShareLink({ code }: { code: string }) {
+  const [copied, setCopied] = useState(false);
+  const url =
+    typeof window === "undefined"
+      ? `/friend?code=${code}`
+      : `${window.location.origin}/friend?code=${code}`;
+  const copy = async () => {
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1600);
+    } catch {}
+  };
+  return (
+    <div className="mt-4 flex items-center gap-2 max-w-md mx-auto">
+      <input
+        readOnly
+        value={url}
+        onFocus={(e) => e.currentTarget.select()}
+        className="flex-1 bg-ink-900/60 border border-white/15 rounded-sm px-3 py-2 text-xs font-mono text-parchment-200 focus:outline-none focus:border-gold/60"
+      />
+      <button
+        onClick={copy}
+        className="px-4 py-2 rounded-sm btn-ghost font-body text-xs whitespace-nowrap"
+      >
+        {copied ? "Copied!" : "Copy link"}
+      </button>
+    </div>
   );
 }
 

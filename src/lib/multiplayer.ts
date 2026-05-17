@@ -1,16 +1,16 @@
-// Two-player chess matchmaking via a public MQTT broker.
+// Two-player chess matchmaking via ntfy.sh.
 //
-// We dropped WebRTC-based P2P (PeerJS, Trystero/Nostr) because the
-// signaling layer kept failing — public signaling services are
-// inconsistently reachable, and once you can't introduce the peers,
-// nothing works. Instead, we relay messages through `broker.emqx.io`,
-// EMQ's long-running public test broker, over secure WebSockets.
+// We've tried WebRTC P2P (PeerJS, Trystero/Nostr) and an MQTT-over-WebSockets
+// broker, and both kept failing because the underlying services were either
+// unreachable from some networks or required heavy client libraries that
+// didn't reliably load in the browser.
 //
-// Each game is a topic `drawbackchess/v1/<code>`. Both players subscribe
-// to it and publish to it. We tag each message with the sender's
-// client ID and ignore our own. A small `hello` handshake lets the host
-// detect when the guest has actually subscribed (vs. just typed the
-// code) so the host knows when to send `init`.
+// ntfy.sh is a free public pub/sub service that uses ordinary HTTPS:
+// - publish:   POST https://ntfy.sh/<topic>
+// - subscribe: EventSource on https://ntfy.sh/<topic>/sse
+// Both use browser-native APIs (fetch + EventSource), no external library,
+// no WebRTC, no signaling negotiation. Each game gets its own topic keyed
+// by the 5-letter code; both players publish to and subscribe to it.
 
 import type { Move } from "@/engine/types";
 
@@ -28,9 +28,9 @@ export type MPEvent =
   | { type: "disconnected" }
   | { type: "error"; message: string };
 
-const BROKER_URL = "wss://broker.emqx.io:8084/mqtt";
-const TOPIC_PREFIX = "drawbackchess/v1/";
-const CONNECT_TIMEOUT_MS = 15000;
+const BASE = "https://ntfy.sh";
+const TOPIC_PREFIX = "drawbackchess-v1-";
+const SUBSCRIBE_TIMEOUT_MS = 10000;
 const JOIN_TIMEOUT_MS = 25000;
 
 type Envelope = { from: string; role: "host" | "guest"; payload: MPMessage | { type: "hello" } };
@@ -48,11 +48,12 @@ function randomId(): string {
 }
 
 export class MPSession {
-  private client: any | null = null;
+  private es: EventSource | null = null;
   private topic = "";
   private clientId = randomId();
   private listeners: Array<(e: MPEvent) => void> = [];
   private peerSeen = false;
+  private helloInterval: any = null;
   isHost = false;
   code = "";
 
@@ -67,88 +68,108 @@ export class MPSession {
     for (const fn of [...this.listeners]) fn(e);
   }
 
-  private async connect(code: string, role: "host" | "guest"): Promise<void> {
-    const mqtt = (await import("mqtt")).default;
+  private async openTopic(code: string): Promise<void> {
     this.code = code;
     this.topic = TOPIC_PREFIX + code;
-    const client = mqtt.connect(BROKER_URL, {
-      clientId: "dc_" + this.clientId,
-      clean: true,
-      reconnectPeriod: 2000,
-      connectTimeout: CONNECT_TIMEOUT_MS,
-    });
-    this.client = client;
+    const url = `${BASE}/${this.topic}/sse`;
+    const es = new EventSource(url);
+    this.es = es;
 
     await new Promise<void>((resolve, reject) => {
       let settled = false;
       const timer = setTimeout(() => {
         if (settled) return;
         settled = true;
-        try { client.end(true); } catch {}
-        reject(new Error("Couldn't reach the matchmaking server. Try again."));
-      }, CONNECT_TIMEOUT_MS);
-      client.on("connect", () => {
-        if (settled) return;
-        client.subscribe(this.topic, { qos: 1 }, (err: any) => {
-          if (settled) return;
-          settled = true;
-          clearTimeout(timer);
-          if (err) {
-            reject(err);
-            return;
-          }
-          resolve();
-        });
-      });
-      client.on("error", (e: any) => {
+        try { es.close(); } catch {}
+        reject(new Error("Couldn't reach the matchmaking server. Check your connection and try again."));
+      }, SUBSCRIBE_TIMEOUT_MS);
+      es.onopen = () => {
         if (settled) return;
         settled = true;
         clearTimeout(timer);
-        try { client.end(true); } catch {}
-        reject(e);
-      });
+        resolve();
+      };
+      es.onerror = (ev) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(timer);
+        try { es.close(); } catch {}
+        console.error("[multiplayer] EventSource error:", ev);
+        reject(new Error("Connection to the matchmaking server failed."));
+      };
     });
 
-    client.on("message", (_topic: string, payloadBuf: Uint8Array) => {
-      let env: Envelope;
+    es.onmessage = (ev: MessageEvent) => {
+      let outer: any;
       try {
-        env = JSON.parse(new TextDecoder().decode(payloadBuf));
+        outer = JSON.parse(ev.data);
       } catch {
         return;
       }
-      if (env.from === this.clientId) return; // our own broadcast
-      if (env.role === role) return; // ignore same-role (e.g. two hosts)
-      if (!this.peerSeen) {
-        this.peerSeen = true;
-        this.emit(this.isHost ? { type: "guest-connected" } : { type: "host-ready" });
-      }
-      const payload = env.payload as any;
-      if (payload?.type === "hello") {
-        // The other side announcing themselves; emit a presence event and
-        // reply with our own hello so they detect us too.
-        this.publish({ type: "hello" } as any);
+      // ntfy wraps published bodies inside an `event: message` JSON with a
+      // `message` field that contains our payload as a string.
+      if (outer.event !== "message" || typeof outer.message !== "string") return;
+      let env: Envelope;
+      try {
+        env = JSON.parse(outer.message);
+      } catch {
         return;
       }
-      this.emit({ type: "message", message: payload as MPMessage });
-    });
+      this.handleEnvelope(env);
+    };
+    es.onerror = () => {
+      // EventSource auto-reconnects on transient errors; we only treat it as
+      // disconnect once we've actually seen the peer to avoid early noise.
+      if (this.peerSeen) console.warn("[multiplayer] SSE stream blip; reconnecting…");
+    };
 
-    client.on("close", () => {
-      if (this.peerSeen) this.emit({ type: "disconnected" });
-    });
-
-    // Announce presence so the other side can detect us.
-    this.publish({ type: "hello" } as any);
+    // Announce presence so the other side detects us. Repeat a few times in
+    // case our publish lands before the other side has subscribed.
+    await this.publish({ type: "hello" } as any);
+    this.helloInterval = setInterval(() => {
+      if (this.peerSeen) {
+        clearInterval(this.helloInterval);
+        this.helloInterval = null;
+        return;
+      }
+      this.publish({ type: "hello" } as any).catch(() => {});
+    }, 1500);
   }
 
-  private publish(payload: MPMessage | { type: "hello" }) {
-    if (!this.client) return;
+  private handleEnvelope(env: Envelope) {
+    if (env.from === this.clientId) return;
+    const myRole = this.isHost ? "host" : "guest";
+    if (env.role === myRole) return; // ignore peers in the same role
+    const firstSighting = !this.peerSeen;
+    if (firstSighting) {
+      this.peerSeen = true;
+      if (this.helloInterval) {
+        clearInterval(this.helloInterval);
+        this.helloInterval = null;
+      }
+      this.emit(this.isHost ? { type: "guest-connected" } : { type: "host-ready" });
+    }
+    const payload = env.payload as any;
+    if (payload?.type === "hello") {
+      // Reply with our own hello so the other side learns about us if it
+      // came online after our initial hello bursts.
+      if (firstSighting) this.publish({ type: "hello" } as any).catch(() => {});
+      return;
+    }
+    this.emit({ type: "message", message: payload as MPMessage });
+  }
+
+  private async publish(payload: MPMessage | { type: "hello" }): Promise<void> {
     const env: Envelope = {
       from: this.clientId,
       role: this.isHost ? "host" : "guest",
       payload,
     };
     try {
-      this.client.publish(this.topic, JSON.stringify(env), { qos: 1 });
+      await fetch(`${BASE}/${this.topic}`, {
+        method: "POST",
+        body: JSON.stringify(env),
+      });
     } catch (e) {
       console.error("[multiplayer] publish error:", e);
     }
@@ -158,7 +179,7 @@ export class MPSession {
     this.isHost = true;
     const code = randomCode();
     try {
-      await this.connect(code, "host");
+      await this.openTopic(code);
       this.emit({ type: "open", code });
       return code;
     } catch (e: any) {
@@ -172,14 +193,13 @@ export class MPSession {
   async join(code: string): Promise<void> {
     this.isHost = false;
     try {
-      await this.connect(code, "guest");
+      await this.openTopic(code);
     } catch (e: any) {
       const msg = String(e?.message || e) || "Could not join game.";
       console.error("[multiplayer] join error:", e);
       this.emit({ type: "error", message: msg });
       throw new Error(msg);
     }
-    // Wait for the host to announce themselves.
     await new Promise<void>((resolve, reject) => {
       if (this.peerSeen) {
         resolve();
@@ -206,14 +226,16 @@ export class MPSession {
   }
 
   send(message: MPMessage) {
-    this.publish(message);
+    this.publish(message).catch(() => {});
   }
 
   destroy() {
-    try {
-      this.client?.end(true);
-    } catch {}
-    this.client = null;
+    if (this.helloInterval) {
+      clearInterval(this.helloInterval);
+      this.helloInterval = null;
+    }
+    try { this.es?.close(); } catch {}
+    this.es = null;
     this.peerSeen = false;
     this.listeners = [];
   }
