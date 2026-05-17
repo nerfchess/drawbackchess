@@ -129,12 +129,14 @@ export class MPSession {
           settled = true;
           clearTimeout(timer);
           resolve();
-        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT" || status === "CLOSED") {
+        } else if (status === "CHANNEL_ERROR" || status === "TIMED_OUT") {
           settled = true;
           clearTimeout(timer);
           console.error("[multiplayer] channel error:", status, err);
-          reject(new Error("Couldn't reach the matchmaking server."));
+          const detail = err?.message || (typeof err === "string" ? err : "");
+          reject(new Error(detail ? `Matchmaking error: ${detail}` : "Couldn't reach the matchmaking server."));
         }
+        // Ignore CLOSED — it fires during normal teardown after SUBSCRIBED.
       });
     });
 
