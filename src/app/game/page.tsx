@@ -3,6 +3,7 @@
 import { Board } from "@/components/Board";
 import { DrawbackCard } from "@/components/DrawbackCard";
 import { GameOver } from "@/components/GameOver";
+import { MaterialBar } from "@/components/MaterialBar";
 import { MoveList } from "@/components/MoveList";
 import { AILevel, pickAIMove } from "@/engine/ai";
 import { Drawback } from "@/engine/drawback";
@@ -411,6 +412,7 @@ function GamePage() {
               active={!game.result && game.board.turn !== myColor}
             />
           )}
+          <MaterialBar board={game.board} side={myColor === "w" ? "b" : "w"} />
           <Board
             board={virtualBoard ?? game.board}
             legalMoves={game.board.turn === myColor && !premovePending ? moves : premoveOptions}
@@ -424,6 +426,7 @@ function GamePage() {
             premoves={validPremoves}
             onCancelPremove={cancelPremove}
           />
+          <MaterialBar board={game.board} side={myColor} />
           {clockEnabled && (
             <ClockPill
               label="You"

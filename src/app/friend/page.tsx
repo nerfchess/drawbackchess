@@ -6,6 +6,7 @@ import { useSearchParams } from "next/navigation";
 import { Board } from "@/components/Board";
 import { DrawbackCard } from "@/components/DrawbackCard";
 import { GameOver } from "@/components/GameOver";
+import { MaterialBar } from "@/components/MaterialBar";
 import { MoveList } from "@/components/MoveList";
 import { isInCheck } from "@/engine/board";
 import { IMPLEMENTED_BY_ID, PLAYABLE_DRAWBACKS } from "@/engine/drawbacks/library";
@@ -583,6 +584,7 @@ function FriendPage() {
               active={!game.result && game.board.turn !== myColor}
             />
           )}
+          <MaterialBar board={game.board} side={myColor === "w" ? "b" : "w"} />
           <Board
             board={virtualBoard ?? game.board}
             legalMoves={game.board.turn === myColor && !premovePending ? moves : premoveOptions}
@@ -595,6 +597,7 @@ function FriendPage() {
             premoves={validPremoves}
             onCancelPremove={clearPremoves}
           />
+          <MaterialBar board={game.board} side={myColor} />
           {clockEnabledRef.current && (
             <ClockPill
               label="You"

@@ -127,6 +127,14 @@ export function Board({
     return set;
   }, [selected, movesFrom]);
 
+  // Keep the latest `targets` and `tryPlay` available to the pointer event
+  // handlers (which were captured by closure when the drag started). Without
+  // these, dropping after the board state has updated (opponent moved mid-
+  // drag, premove fired, etc.) would use stale targets.
+  const targetsRef = useRef(targets);
+  targetsRef.current = targets;
+  const tryPlayRef = useRef<(sq: Square) => boolean>(() => false);
+
   const orderedSquares: Square[] = [];
   for (let r = 7; r >= 0; r--) {
     for (let f = 0; f < 8; f++) {
@@ -152,8 +160,9 @@ export function Board({
   };
 
   const tryPlay = (sq: Square): boolean => {
-    if (selected != null && targets[sq]) {
-      const candidates = targets[sq];
+    const ts = targetsRef.current;
+    if (selected != null && ts[sq]) {
+      const candidates = ts[sq];
       if (candidates.length > 1 && candidates[0].promotion) {
         if (premoveMode) {
           // auto-queen premove promotions; the user can't be asked mid-opponent-turn
@@ -171,10 +180,17 @@ export function Board({
     }
     return false;
   };
+  // Keep the latest tryPlay accessible to the long-lived pointer handlers.
+  tryPlayRef.current = tryPlay;
 
   // Plain click / tap (no drag): toggle selection and play the move on the second tap.
   const handleSquareClick = (sq: Square) => {
     if (disabled) return;
+    // Clicking the already-selected piece toggles selection off.
+    if (selected === sq) {
+      setSelected(null);
+      return;
+    }
     if (tryPlay(sq)) return;
     const piece = board.pieces[sq];
     if (piece && piece.color === myColor && movesFrom.has(sq)) {
@@ -250,14 +266,16 @@ export function Board({
     const onUp = (e: PointerEvent) => {
       if (e.pointerId !== drag.pointerId) return;
       const sq = squareAtClient(e.clientX, e.clientY);
-      if (sq != null && sq !== drag.from && targets[sq]) {
-        tryPlay(sq);
+      const liveTargets = targetsRef.current;
+      if (sq != null && sq !== drag.from && liveTargets[sq]) {
+        tryPlayRef.current(sq);
       } else if (sq != null && sq !== drag.from) {
         setSelected(null);
       }
       setDrag(null);
       setHoverSq(null);
       lastHoverRef.current = null;
+      lastGhostPosRef.current = null;
       gridRectRef.current = null;
     };
     const onCancel = () => {
@@ -291,11 +309,17 @@ export function Board({
 
   // Re-apply the ghost transform after every render. Without this, a parent
   // re-render (e.g. opponent move arriving mid-drag) can erase the inline
-  // transform we set imperatively, snapping the visual back to (0,0).
+  // transform we set imperatively, snapping the visual back to (0,0). We
+  // also re-measure the grid rect in case the page layout shifted (the
+  // opponent's move can change clock/material bars above the board).
   useLayoutEffect(() => {
-    if (!drag || !ghostRef.current || !lastGhostPosRef.current) return;
-    const { x, y } = lastGhostPosRef.current;
-    ghostRef.current.style.transform = `translate3d(${x - drag.cell / 2}px, ${y - drag.cell / 2}px, 0)`;
+    if (!drag) return;
+    const grid = boardRef.current?.querySelector("[data-board-grid]") as HTMLElement | null;
+    if (grid) gridRectRef.current = grid.getBoundingClientRect();
+    if (ghostRef.current && lastGhostPosRef.current) {
+      const { x, y } = lastGhostPosRef.current;
+      ghostRef.current.style.transform = `translate3d(${x - drag.cell / 2}px, ${y - drag.cell / 2}px, 0)`;
+    }
   });
 
   const handleContextMenu = (e: React.MouseEvent) => {
