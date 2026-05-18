@@ -20,6 +20,8 @@ import { Color, Move } from "@/engine/types";
 import { MPMessage, MPSession, SUPABASE_CONFIGURED } from "@/lib/multiplayer";
 import { usePremoves } from "@/lib/premoves";
 import { isMuted, playCapture, playCheck, playMove as playMoveSfx, setMuted } from "@/lib/sounds";
+import { TimeControlPicker } from "@/components/TimeControlPicker";
+import { TimeControl } from "@/lib/timeControl";
 
 type View = "setup" | "lobby" | "joining" | "game";
 
@@ -50,7 +52,7 @@ function FriendPage() {
   const [view, setView] = useState<View>("setup");
   const [code, setCode] = useState("");
   const [joinCode, setJoinCode] = useState("");
-  const [timeSec, setTimeSec] = useState(600);
+  const [tc, setTc] = useState<TimeControl>({ sec: 600, inc: 5 });
   const [error, setError] = useState<string | null>(null);
   const [muted, setMutedState] = useState(false);
 
@@ -58,30 +60,48 @@ function FriendPage() {
   const [myColor, setMyColor] = useState<Color>("w");
   const [whiteMs, setWhiteMs] = useState(0);
   const [blackMs, setBlackMs] = useState(0);
+  const [incSec, setIncSec] = useState(0);
+  const [rematchState, setRematchState] = useState<"idle" | "offered" | "incoming" | "declined">("idle");
 
   const sessionRef = useRef<MPSession | null>(null);
   const clockEnabledRef = useRef(false);
   const initHandledRef = useRef(false);
+  const lastInitSeedRef = useRef<number | null>(null);
+  const myColorRef = useRef<Color>("w");
+  const lastTcRef = useRef<TimeControl>({ sec: 600, inc: 0 });
+  const rematchStateRef = useRef<"idle" | "offered" | "incoming" | "declined">("idle");
+  useEffect(() => {
+    myColorRef.current = myColor;
+  }, [myColor]);
+  useEffect(() => {
+    rematchStateRef.current = rematchState;
+  }, [rematchState]);
 
   useEffect(() => setMutedState(isMuted()), []);
 
   // If opened with ?code=XXXXX, auto-join. If also `host=1` (challenge-host),
-  // auto-create with the provided time control. Plain `?code=XXXXX&t=600`
+  // auto-create with the provided time control. Plain `?code=XXXXX&t=600&inc=3`
   // (challenge guest) auto-joins.
   useEffect(() => {
     if (typeof window === "undefined") return;
     const c = searchParams.get("code");
     const isHost = searchParams.get("host") === "1";
     const tParam = searchParams.get("t");
+    const incParam = searchParams.get("inc");
+    let parsedTc: TimeControl | null = null;
     if (tParam) {
       const t = parseInt(tParam, 10);
-      if (Number.isFinite(t) && t >= 0) setTimeSec(t);
+      const inc = incParam ? parseInt(incParam, 10) : 0;
+      if (Number.isFinite(t) && t >= 0) {
+        parsedTc = { sec: t, inc: Number.isFinite(inc) ? inc : 0 };
+        setTc(parsedTc);
+      }
     }
     if (!c) return;
     const clean = c.trim().toUpperCase().slice(0, 6);
     if (!clean) return;
     if (isHost) {
-      setTimeout(() => handleCreateWithCode(clean, tParam ? parseInt(tParam, 10) : timeSec), 0);
+      setTimeout(() => handleCreateWithCode(clean, parsedTc ?? tc), 0);
     } else {
       setJoinCode(clean);
       setTimeout(() => handleJoinWith(clean), 0);
@@ -105,11 +125,50 @@ function FriendPage() {
     const b = IMPLEMENTED_BY_ID[msg.blackDrawbackId] ?? pickRandomDrawback();
     setGame(newGame(w, b, msg.seed));
     setMyColor(asColor);
+    myColorRef.current = asColor;
     setWhiteMs(msg.timeSec * 1000);
     setBlackMs(msg.timeSec * 1000);
+    setIncSec(msg.incSec ?? 0);
     clockEnabledRef.current = msg.timeSec > 0;
+    lastTcRef.current = { sec: msg.timeSec, inc: msg.incSec ?? 0 };
     lastSentCount.current = 0;
+    lastInitSeedRef.current = msg.seed;
+    setRematchState("idle");
+    initHandledRef.current = true;
     setView("game");
+  };
+
+  // Either side of a finished game initiates the rematch by sending an offer.
+  // When agreed, whichever side just played black generates the next init so
+  // colors swap (their old guest becomes the new white).
+  const startRematchAsBlackSide = () => {
+    setRematchState("idle");
+    if (myColorRef.current !== "b") return; // the white side just waits
+    const tc = lastTcRef.current;
+    const init: Extract<MPMessage, { type: "init" }> = {
+      type: "init",
+      whiteDrawbackId: pickRandomDrawback().id,
+      blackDrawbackId: pickRandomDrawback().id,
+      seed: makeSeed(),
+      timeSec: tc.sec,
+      incSec: tc.inc,
+    };
+    sessionRef.current?.send(init);
+    startGameFromInit(init, "w");
+  };
+
+  const offerRematch = () => {
+    if (rematchStateRef.current !== "idle") return;
+    setRematchState("offered");
+    sessionRef.current?.send({ type: "rematch-offer" });
+  };
+  const acceptRematch = () => {
+    sessionRef.current?.send({ type: "rematch-accept" });
+    startRematchAsBlackSide();
+  };
+  const declineRematch = () => {
+    sessionRef.current?.send({ type: "rematch-decline" });
+    setRematchState("idle");
   };
 
   // Set up the session event handler. We do this once a session exists so we
@@ -137,19 +196,18 @@ function FriendPage() {
         // init in response, in case the host's first burst didn't land.
         sess.send({ type: "ping" });
       } else if (e.type === "message" && role === "host" && e.message.type === "ping") {
-        // Guest is asking for init — re-send.
+        // Guest is asking for init — re-send (first-game flow).
         if (payload) sess.send(payload as Extract<MPMessage, { type: "init" }>);
-      } else if (e.type === "message" && role === "guest" && e.message.type === "init") {
-        // Host re-sends init a few times for reliability; only act on the first.
-        if (initHandledRef.current) return;
-        initHandledRef.current = true;
+      } else if (e.type === "message" && e.message.type === "init") {
+        // First-game guest path AND rematch receiver path. Dedupe by seed
+        // because the original-game host blasts the same init 4 times.
+        if (lastInitSeedRef.current === e.message.seed) return;
         startGameFromInit(e.message, "b");
       } else if (e.type === "message" && e.message.type === "move") {
-        // Opponent's move — apply locally
+        // Opponent's move — apply locally, give them their increment.
         const incoming = e.message.move;
         setGame((g) => {
           if (!g) return g;
-          // Find the matching legal move (so engine state is consistent)
           const lm = legalMoves(g).find(
             (x) =>
               x.from === incoming.from &&
@@ -161,8 +219,27 @@ function FriendPage() {
           if (lm.captured) playCapture();
           else playMoveSfx();
           if (isInCheck(next.board, next.board.turn)) setTimeout(playCheck, 80);
+          if (clockEnabledRef.current && incSec > 0) {
+            const add = incSec * 1000;
+            // The moving side is the opponent of *my* color
+            if (myColor === "w") setBlackMs((t) => t + add);
+            else setWhiteMs((t) => t + add);
+          }
           return { ...next };
         });
+      } else if (e.type === "message" && e.message.type === "rematch-offer") {
+        setRematchState((s) => (s === "offered" ? "idle" : "incoming"));
+        // If both offered simultaneously, treat as mutual accept.
+        if (rematchStateRef.current === "offered") {
+          startRematchAsBlackSide();
+        }
+      } else if (e.type === "message" && e.message.type === "rematch-accept") {
+        if (rematchStateRef.current === "offered") {
+          startRematchAsBlackSide();
+        }
+      } else if (e.type === "message" && e.message.type === "rematch-decline") {
+        setRematchState("declined");
+        setTimeout(() => setRematchState("idle"), 2500);
       } else if (e.type === "message" && e.message.type === "resign") {
         setGame((g) => {
           if (!g) return g;
@@ -173,12 +250,12 @@ function FriendPage() {
     });
   };
 
-  const handleCreate = async () => handleCreateWithCode(null, timeSec);
+  const handleCreate = async () => handleCreateWithCode(null, tc);
 
   // If `presetCode` is given, host on that exact room code (used for the
   // lobby-challenge flow where both sides know the code ahead of time).
   // Otherwise the session generates a random one.
-  const handleCreateWithCode = async (presetCode: string | null, useTimeSec: number) => {
+  const handleCreateWithCode = async (presetCode: string | null, useTc: TimeControl) => {
     setError(null);
     setCode("");
     setView("lobby");
@@ -189,7 +266,8 @@ function FriendPage() {
       whiteDrawbackId: pickRandomDrawback().id,
       blackDrawbackId: pickRandomDrawback().id,
       seed: makeSeed(),
-      timeSec: useTimeSec,
+      timeSec: useTc.sec,
+      incSec: useTc.inc,
     };
     wireSession(sess, "host", init);
     try {
@@ -222,11 +300,17 @@ function FriendPage() {
   };
   const handleJoin = () => handleJoinWith(joinCode);
 
-  // Apply one of our own legal moves: update local state and send to peer.
+  // Apply one of our own legal moves: update local state, give us back our
+  // increment, and send to peer.
   const applyMyMove = (m: Move) => {
     if (!game || game.result) return;
     const next = playMove(game, m);
     setGame({ ...next });
+    if (clockEnabledRef.current && incSec > 0) {
+      const add = incSec * 1000;
+      if (myColor === "w") setWhiteMs((t) => t + add);
+      else setBlackMs((t) => t + add);
+    }
     sessionRef.current?.send({ type: "move", move: m });
     if (m.captured) playCapture();
     else playMoveSfx();
@@ -328,31 +412,7 @@ function FriendPage() {
           )}
 
           <div className="mt-8 plate p-6 sm:p-7 space-y-6">
-            <div>
-              <div className="smallcaps text-[11px] text-parchment-400 mb-2">Time per side</div>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { s: 0, l: "Unlimited" },
-                  { s: 180, l: "3 min" },
-                  { s: 300, l: "5 min" },
-                  { s: 600, l: "10 min" },
-                  { s: 1800, l: "30 min" },
-                ].map(({ s, l }) => (
-                  <button
-                    key={s}
-                    onClick={() => setTimeSec(s)}
-                    className={
-                      "px-3 py-1.5 rounded-full text-xs font-display transition border " +
-                      (timeSec === s
-                        ? "bg-gold/20 border-gold text-gold-leaf"
-                        : "border-white/15 text-parchment-300 hover:border-white/30")
-                    }
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
-            </div>
+            <TimeControlPicker value={tc} onChange={setTc} />
 
             <button
               onClick={handleCreate}
@@ -509,7 +569,17 @@ function FriendPage() {
           whiteDrawback={game.white.drawback}
           blackDrawback={game.black.drawback}
           myColor={myColor}
-          onRematch={handleRematch}
+          onRematch={rematchState === "incoming" ? acceptRematch : offerRematch}
+          rematchLabel={
+            rematchState === "incoming"
+              ? "Accept rematch"
+              : rematchState === "offered"
+              ? "Rematch offered…"
+              : "Rematch"
+          }
+          rematchStatus={rematchState}
+          onAcceptRematch={acceptRematch}
+          onDeclineRematch={declineRematch}
         />
       )}
     </main>

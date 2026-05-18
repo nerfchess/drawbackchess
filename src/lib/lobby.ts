@@ -12,6 +12,8 @@ export interface LobbyPlayer {
   id: string;
   name: string;
   timeSec: number;
+  incSec: number;
+  rating?: number;
   joinedAt: number;
 }
 
@@ -21,6 +23,7 @@ export type ChallengeOffer = {
   fromName: string;
   to: string;
   timeSec: number;
+  incSec: number;
   code: string;
 };
 
@@ -50,8 +53,8 @@ export function makeRoomCode(): string {
 }
 
 export interface LobbyHandle {
-  setTimePref: (sec: number) => void;
-  sendChallenge: (toId: string, timeSec: number, code: string) => Promise<void>;
+  setTimePref: (sec: number, inc: number) => void;
+  sendChallenge: (toId: string, timeSec: number, incSec: number, code: string) => Promise<void>;
   reply: (msg: ChallengeReply) => Promise<void>;
   leave: () => Promise<void>;
 }
@@ -59,13 +62,15 @@ export interface LobbyHandle {
 export interface LobbyOptions {
   identity: Identity;
   initialTimeSec: number;
+  initialIncSec: number;
+  rating?: number;
   onPlayers: (players: LobbyPlayer[]) => void;
   onMessage: (m: LobbyMessage) => void;
   onStatus?: (status: "connecting" | "connected" | "error") => void;
 }
 
 export async function joinLobby(opts: LobbyOptions): Promise<LobbyHandle> {
-  const { identity, initialTimeSec, onPlayers, onMessage, onStatus } = opts;
+  const { identity, initialTimeSec, initialIncSec, rating, onPlayers, onMessage, onStatus } = opts;
   onStatus?.("connecting");
 
   const c = client();
@@ -92,14 +97,23 @@ export async function joinLobby(opts: LobbyOptions): Promise<LobbyHandle> {
   });
 
   let currentTime = initialTimeSec;
+  let currentInc = initialIncSec;
+  let currentRating = rating;
 
   channel.on("presence", { event: "sync" }, () => {
-    const state = channel.presenceState() as Record<string, Array<{ name: string; timeSec: number; joinedAt: number }>>;
+    const state = channel.presenceState() as Record<string, Array<{ name: string; timeSec: number; incSec?: number; rating?: number; joinedAt: number }>>;
     const players: LobbyPlayer[] = [];
     for (const [id, metas] of Object.entries(state)) {
       const meta = metas[0];
       if (!meta) continue;
-      players.push({ id, name: meta.name, timeSec: meta.timeSec, joinedAt: meta.joinedAt });
+      players.push({
+        id,
+        name: meta.name,
+        timeSec: meta.timeSec,
+        incSec: meta.incSec ?? 0,
+        rating: meta.rating,
+        joinedAt: meta.joinedAt,
+      });
     }
     players.sort((a, b) => a.joinedAt - b.joinedAt);
     onPlayers(players);
@@ -129,6 +143,8 @@ export async function joinLobby(opts: LobbyOptions): Promise<LobbyHandle> {
         await channel.track({
           name: identity.name,
           timeSec: currentTime,
+          incSec: currentInc,
+          rating: currentRating,
           joinedAt: Date.now(),
         });
         onStatus?.("connected");
@@ -144,21 +160,25 @@ export async function joinLobby(opts: LobbyOptions): Promise<LobbyHandle> {
   });
 
   return {
-    setTimePref: (sec: number) => {
+    setTimePref: (sec: number, inc: number) => {
       currentTime = sec;
+      currentInc = inc;
       channel.track({
         name: identity.name,
         timeSec: sec,
+        incSec: inc,
+        rating: currentRating,
         joinedAt: Date.now(),
       });
     },
-    sendChallenge: async (toId, timeSec, code) => {
+    sendChallenge: async (toId, timeSec, incSec, code) => {
       const payload: ChallengeOffer = {
         type: "challenge",
         from: identity.id,
         fromName: identity.name,
         to: toId,
         timeSec,
+        incSec,
         code,
       };
       await channel.send({ type: "broadcast", event: "lobby-msg", payload });

@@ -15,9 +15,25 @@ interface Props {
   blackDrawback: Drawback;
   myColor: Color;
   onRematch: () => void;
+  // Optional inline rematch flow for multiplayer: shows a different label and
+  // a status banner while waiting for the opponent to respond.
+  rematchLabel?: string;
+  rematchStatus?: "idle" | "offered" | "incoming" | "declined";
+  onAcceptRematch?: () => void;
+  onDeclineRematch?: () => void;
 }
 
-export function GameOver({ result, whiteDrawback, blackDrawback, myColor, onRematch }: Props) {
+export function GameOver({
+  result,
+  whiteDrawback,
+  blackDrawback,
+  myColor,
+  onRematch,
+  rematchLabel,
+  rematchStatus,
+  onAcceptRematch,
+  onDeclineRematch,
+}: Props) {
   const won = result.winner === myColor;
   const draw = result.winner === "draw";
   const headline = draw ? "Draw" : won ? "You win!" : "You lose";
@@ -59,12 +75,41 @@ export function GameOver({ result, whiteDrawback, blackDrawback, myColor, onRema
           <DrawbackCard drawback={blackDrawback} ownerLabel="Black's drawback" />
         </div>
 
+        {rematchStatus === "incoming" && onAcceptRematch && onDeclineRematch ? (
+          <div className="mt-7 plate p-4 text-center border-gold/40 bg-gold/10">
+            <div className="smallcaps text-[11px] text-parchment-300">Opponent wants a rematch</div>
+            <div className="mt-3 flex justify-center gap-2">
+              <button
+                onClick={onAcceptRematch}
+                className="px-5 py-2 rounded-full btn-leaf font-display text-sm"
+              >
+                Accept rematch
+              </button>
+              <button
+                onClick={onDeclineRematch}
+                className="px-5 py-2 rounded-full btn-ghost font-display text-sm"
+              >
+                Decline
+              </button>
+            </div>
+          </div>
+        ) : rematchStatus === "offered" ? (
+          <div className="mt-7 text-center text-sm text-parchment-300 italic">
+            Waiting for opponent to respond…
+          </div>
+        ) : rematchStatus === "declined" ? (
+          <div className="mt-7 text-center text-sm text-oxblood-glow">
+            Opponent declined the rematch.
+          </div>
+        ) : null}
+
         <div className="mt-7 flex flex-col sm:flex-row gap-2 justify-center">
           <button
             onClick={onRematch}
-            className="px-6 py-3 rounded-full btn-leaf font-display text-base"
+            disabled={rematchStatus === "offered"}
+            className="px-6 py-3 rounded-full btn-leaf font-display text-base disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            New game
+            {rematchLabel ?? "New game"}
           </button>
           <Link
             href="/codex"

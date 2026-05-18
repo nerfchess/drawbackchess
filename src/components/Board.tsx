@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useMemo, useRef, useState } from "react";
+import React, { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Piece } from "./Pieces";
 import { BoardState, Color, FILE, Move, PieceType, RANK, SQ, Square } from "@/engine/types";
@@ -49,6 +49,11 @@ interface DragState {
   from: Square;
   pointerId: number;
   cell: number; // pixel size of one square
+  // Snapshot of the piece at drag-start, so the ghost keeps rendering even if
+  // the board state mutates mid-drag (e.g. opponent move during premove, or
+  // queued premove firing while we're still holding a piece).
+  pieceType: PieceType;
+  pieceColor: Color;
 }
 
 export function Board({
@@ -80,6 +85,10 @@ export function Board({
   const ghostRef = useRef<HTMLDivElement>(null);
   const gridRectRef = useRef<DOMRect | null>(null);
   const lastHoverRef = useRef<Square | null>(null);
+  // Remember the latest pointer position so we can re-apply the ghost's
+  // transform after React re-renders the Board (board updates mid-drag would
+  // otherwise leave the inline transform stale or briefly blank).
+  const lastGhostPosRef = useRef<{ x: number; y: number } | null>(null);
 
   const movesFrom = useMemo(() => {
     const m = new Map<Square, Move[]>();
@@ -190,9 +199,16 @@ export function Board({
 
     setSelected(sq);
     playSelect();
-    setDrag({ from: sq, pointerId: e.pointerId, cell });
+    setDrag({
+      from: sq,
+      pointerId: e.pointerId,
+      cell,
+      pieceType: piece.type,
+      pieceColor: piece.color,
+    });
     setHoverSq(sq);
     lastHoverRef.current = sq;
+    lastGhostPosRef.current = { x: e.clientX, y: e.clientY };
     // Pre-position the ghost so the first frame is right
     requestAnimationFrame(() => {
       if (ghostRef.current) {
@@ -211,6 +227,7 @@ export function Board({
 
     const flush = () => {
       pending = false;
+      lastGhostPosRef.current = { x: pendingX, y: pendingY };
       if (ghostRef.current) {
         ghostRef.current.style.transform = `translate3d(${pendingX - drag.cell / 2}px, ${pendingY - drag.cell / 2}px, 0)`;
       }
@@ -272,7 +289,14 @@ export function Board({
   const inKingPass = (sq: Square) =>
     board.kingPassThrough.includes(sq) && board.kingPassColor !== myColor;
 
-  const draggedPiece = drag ? board.pieces[drag.from] : null;
+  // Re-apply the ghost transform after every render. Without this, a parent
+  // re-render (e.g. opponent move arriving mid-drag) can erase the inline
+  // transform we set imperatively, snapping the visual back to (0,0).
+  useLayoutEffect(() => {
+    if (!drag || !ghostRef.current || !lastGhostPosRef.current) return;
+    const { x, y } = lastGhostPosRef.current;
+    ghostRef.current.style.transform = `translate3d(${x - drag.cell / 2}px, ${y - drag.cell / 2}px, 0)`;
+  });
 
   const handleContextMenu = (e: React.MouseEvent) => {
     // right-click cancels the whole premove queue (chess.com convention)
@@ -398,8 +422,10 @@ export function Board({
         </div>
       </div>
 
-      {/* Floating drag ghost — position is written directly via ref to avoid React re-renders */}
-      {drag && draggedPiece && (
+      {/* Floating drag ghost — position is written directly via ref to avoid React re-renders.
+          We use the snapshot from DragState (not a live board lookup) so the ghost survives
+          any board mutation (opponent move, premove firing, capture) during the drag. */}
+      {drag && (
         <div
           ref={ghostRef}
           className="drag-ghost"
@@ -411,7 +437,7 @@ export function Board({
             willChange: "transform",
           }}
         >
-          <Piece type={draggedPiece.type} color={draggedPiece.color} size="100%" />
+          <Piece type={drag.pieceType} color={drag.pieceColor} size="100%" />
         </div>
       )}
 

@@ -24,9 +24,12 @@
 import type { Move } from "@/engine/types";
 
 export type MPMessage =
-  | { type: "init"; whiteDrawbackId: string; blackDrawbackId: string; seed: number; timeSec: number }
+  | { type: "init"; whiteDrawbackId: string; blackDrawbackId: string; seed: number; timeSec: number; incSec?: number; rated?: boolean; whiteId?: string; blackId?: string }
   | { type: "move"; move: Move }
   | { type: "resign" }
+  | { type: "rematch-offer" }
+  | { type: "rematch-accept" }
+  | { type: "rematch-decline" }
   | { type: "ping" };
 
 export type MPEvent =

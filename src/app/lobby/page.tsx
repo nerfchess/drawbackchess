@@ -11,20 +11,15 @@ import {
   type LobbyHandle,
   type LobbyPlayer,
 } from "@/lib/lobby";
-
-const TIME_OPTIONS = [
-  { s: 0, l: "Unlimited" },
-  { s: 180, l: "3 min" },
-  { s: 300, l: "5 min" },
-  { s: 600, l: "10 min" },
-  { s: 1800, l: "30 min" },
-];
+import { TimeControlPicker } from "@/components/TimeControlPicker";
+import { categoryOf, formatTC, type TimeControl } from "@/lib/timeControl";
 
 interface OutgoingChallenge {
   toId: string;
   toName: string;
   code: string;
   timeSec: number;
+  incSec: number;
   at: number;
 }
 
@@ -36,7 +31,7 @@ export default function LobbyPage() {
   const [players, setPlayers] = useState<LobbyPlayer[]>([]);
   const [status, setStatus] = useState<"connecting" | "connected" | "error">("connecting");
   const [error, setError] = useState<string | null>(null);
-  const [timeSec, setTimeSec] = useState(600);
+  const [tc, setTc] = useState<TimeControl>({ sec: 600, inc: 5 });
   const [incoming, setIncoming] = useState<ChallengeOffer | null>(null);
   const [outgoing, setOutgoing] = useState<OutgoingChallenge | null>(null);
   const handleRef = useRef<LobbyHandle | null>(null);
@@ -52,7 +47,8 @@ export default function LobbyPage() {
       try {
         const handle = await joinLobby({
           identity,
-          initialTimeSec: timeSec,
+          initialTimeSec: tc.sec,
+          initialIncSec: tc.inc,
           onPlayers: (p) => {
             if (!mounted) return;
             setPlayers(p);
@@ -65,7 +61,7 @@ export default function LobbyPage() {
               // Our challenge was accepted → navigate as the host.
               setOutgoing((o) => {
                 if (o && o.code === m.code) {
-                  router.push(`/friend?code=${m.code}&host=1&t=${o.timeSec}`);
+                  router.push(`/friend?code=${m.code}&host=1&t=${o.timeSec}&inc=${o.incSec}`);
                 }
                 return null;
               });
@@ -99,8 +95,8 @@ export default function LobbyPage() {
   }, [identity]);
 
   useEffect(() => {
-    handleRef.current?.setTimePref(timeSec);
-  }, [timeSec]);
+    handleRef.current?.setTimePref(tc.sec, tc.inc);
+  }, [tc]);
 
   // Auto-expire stale outgoing challenge after 30s with no reply.
   useEffect(() => {
@@ -123,11 +119,11 @@ export default function LobbyPage() {
   const challenge = async (p: LobbyPlayer) => {
     if (!identity) return;
     if (p.id === identity.id) return;
-    if (outgoing) return; // already have one in flight
+    if (outgoing) return;
     const code = makeRoomCode();
-    setOutgoing({ toId: p.id, toName: p.name, code, timeSec, at: Date.now() });
+    setOutgoing({ toId: p.id, toName: p.name, code, timeSec: tc.sec, incSec: tc.inc, at: Date.now() });
     try {
-      await handleRef.current?.sendChallenge(p.id, timeSec, code);
+      await handleRef.current?.sendChallenge(p.id, tc.sec, tc.inc, code);
     } catch {
       setOutgoing(null);
       setError("Couldn't send challenge. Try again.");
@@ -155,10 +151,9 @@ export default function LobbyPage() {
       to: incoming.from,
       code: incoming.code,
     });
-    const code = incoming.code;
-    const t = incoming.timeSec;
+    const { code, timeSec, incSec } = incoming;
     setIncoming(null);
-    router.push(`/friend?code=${code}&t=${t}`);
+    router.push(`/friend?code=${code}&t=${timeSec}&inc=${incSec}`);
   };
 
   const declineIncoming = async () => {
@@ -244,25 +239,7 @@ export default function LobbyPage() {
             </div>
           </div>
 
-          <div>
-            <div className="smallcaps text-[11px] text-parchment-400 mb-2">Your preferred time</div>
-            <div className="flex flex-wrap gap-2">
-              {TIME_OPTIONS.map(({ s, l }) => (
-                <button
-                  key={s}
-                  onClick={() => setTimeSec(s)}
-                  className={
-                    "px-3 py-1.5 rounded-full text-xs font-display transition border " +
-                    (timeSec === s
-                      ? "bg-gold/20 border-gold text-gold-leaf"
-                      : "border-white/15 text-parchment-300 hover:border-white/30")
-                  }
-                >
-                  {l}
-                </button>
-              ))}
-            </div>
-          </div>
+          <TimeControlPicker value={tc} onChange={setTc} />
         </div>
 
         {error && (
@@ -281,23 +258,31 @@ export default function LobbyPage() {
               No one else here yet. Share the link with a friend and wait — or open this in another tab to test.
             </div>
           )}
-          {otherPlayers.map((p) => (
-            <div key={p.id} className="plate p-4 flex flex-wrap items-center justify-between gap-3">
-              <div>
-                <div className="font-display text-lg text-parchment">{p.name}</div>
-                <div className="smallcaps text-[10px] text-parchment-400">
-                  prefers {TIME_OPTIONS.find((t) => t.s === p.timeSec)?.l ?? `${p.timeSec}s`}
+          {otherPlayers.map((p) => {
+            const ptc: TimeControl = { sec: p.timeSec, inc: p.incSec };
+            return (
+              <div key={p.id} className="plate p-4 flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <div className="font-display text-lg text-parchment flex items-center gap-2">
+                    {p.name}
+                    {p.rating !== undefined && (
+                      <span className="text-xs font-mono text-parchment-300/80">({Math.round(p.rating)})</span>
+                    )}
+                  </div>
+                  <div className="smallcaps text-[10px] text-parchment-400">
+                    prefers {formatTC(ptc)} · {categoryOf(ptc)}
+                  </div>
                 </div>
+                <button
+                  onClick={() => challenge(p)}
+                  disabled={!!outgoing}
+                  className="px-5 py-2 rounded-full btn-leaf font-display text-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  Challenge
+                </button>
               </div>
-              <button
-                onClick={() => challenge(p)}
-                disabled={!!outgoing}
-                className="px-5 py-2 rounded-full btn-leaf font-display text-sm disabled:opacity-50 disabled:cursor-not-allowed"
-              >
-                Challenge
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </div>
       </section>
 
@@ -308,8 +293,7 @@ export default function LobbyPage() {
             <div className="smallcaps text-[11px] text-parchment-400">Incoming challenge</div>
             <div className="mt-3 font-display text-3xl text-gold-leaf">{incoming.fromName}</div>
             <div className="mt-2 text-parchment-200">
-              wants to play —{" "}
-              {TIME_OPTIONS.find((t) => t.s === incoming.timeSec)?.l ?? `${incoming.timeSec}s`}
+              wants to play — {formatTC({ sec: incoming.timeSec, inc: incoming.incSec })}
             </div>
             <div className="mt-6 flex justify-center gap-3">
               <button onClick={acceptIncoming} className="px-6 py-2 rounded-full btn-leaf font-display">

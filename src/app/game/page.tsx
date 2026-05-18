@@ -78,6 +78,10 @@ function GamePage() {
     const t = parseInt(params.get("t") ?? "0", 10);
     return Number.isFinite(t) && t > 0 ? t * 1000 : 0;
   }, [params]);
+  const incSec = useMemo(() => {
+    const i = parseInt(params.get("inc") ?? "0", 10);
+    return Number.isFinite(i) && i > 0 ? i : 0;
+  }, [params]);
   const clockEnabled = initialTimeMs > 0;
 
   const myColor: Color = useMemo(() => {
@@ -125,6 +129,11 @@ function GamePage() {
     if (!game || game.result) return;
     const next = playMove(game, m);
     setGame({ ...next });
+    if (clockEnabled && incSec > 0) {
+      const add = incSec * 1000;
+      if (myColor === "w") setWhiteMs((t) => t + add);
+      else setBlackMs((t) => t + add);
+    }
   };
 
   const {
@@ -206,6 +215,12 @@ function GamePage() {
       if (m) {
         const next = playMove(game, m);
         setGame({ ...next });
+        if (clockEnabled && incSec > 0) {
+          const add = incSec * 1000;
+          // AI just moved; AI is the opponent's color
+          if (myColor === "w") setBlackMs((t) => t + add);
+          else setWhiteMs((t) => t + add);
+        }
       } else {
         game.result = { winner: myColor, reason: "AI has no legal moves" };
         setGame({ ...game });

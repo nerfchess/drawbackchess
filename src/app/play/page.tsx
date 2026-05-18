@@ -4,14 +4,15 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { PLAYABLE_DRAWBACKS } from "@/engine/drawbacks/library";
+import { TimeControlPicker } from "@/components/TimeControlPicker";
+import type { TimeControl } from "@/lib/timeControl";
 
 export default function PlayPage() {
   const router = useRouter();
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [color, setColor] = useState<"w" | "b" | "random">("random");
   const [drawbackId, setDrawbackId] = useState<string>("random");
-  // Time control in seconds per side; 0 = unlimited (no clock)
-  const [timeSec, setTimeSec] = useState<number>(600);
+  const [tc, setTc] = useState<TimeControl>({ sec: 600, inc: 5 });
 
   const start = () => {
     const params = new URLSearchParams({
@@ -19,7 +20,8 @@ export default function PlayPage() {
       difficulty,
       color,
       drawback: drawbackId,
-      t: String(timeSec),
+      t: String(tc.sec),
+      inc: String(tc.inc),
     });
     router.push(`/game?${params.toString()}`);
   };
@@ -75,19 +77,7 @@ export default function PlayPage() {
             <Pill selected={color === "b"} onClick={() => setColor("b")}>Black</Pill>
           </Group>
 
-          <Group label="Time per side">
-            {([
-              { s: 0, l: "Unlimited" },
-              { s: 180, l: "3 min" },
-              { s: 300, l: "5 min" },
-              { s: 600, l: "10 min" },
-              { s: 1800, l: "30 min" },
-            ] as const).map(({ s, l }) => (
-              <Pill key={s} selected={timeSec === s} onClick={() => setTimeSec(s)}>
-                {l}
-              </Pill>
-            ))}
-          </Group>
+          <TimeControlPicker value={tc} onChange={setTc} />
 
           <Group label="Your secret rule">
             <Pill selected={drawbackId === "random"} onClick={() => setDrawbackId("random")}>
