@@ -13,6 +13,8 @@ import {
 } from "@/lib/lobby";
 import { TimeControlPicker } from "@/components/TimeControlPicker";
 import { categoryOf, formatTC, type TimeControl } from "@/lib/timeControl";
+import { fetchRating } from "@/lib/ratings";
+import { formatRating } from "@/lib/glicko";
 
 interface OutgoingChallenge {
   toId: string;
@@ -34,7 +36,16 @@ export default function LobbyPage() {
   const [tc, setTc] = useState<TimeControl>({ sec: 600, inc: 5 });
   const [incoming, setIncoming] = useState<ChallengeOffer | null>(null);
   const [outgoing, setOutgoing] = useState<OutgoingChallenge | null>(null);
+  const [myRating, setMyRating] = useState<number | undefined>(undefined);
   const handleRef = useRef<LobbyHandle | null>(null);
+
+  // Pull our own persisted rating so we can advertise it in presence.
+  useEffect(() => {
+    if (!identity) return;
+    fetchRating(identity.id).then((r) => {
+      if (r) setMyRating(r.rating);
+    });
+  }, [identity]);
 
   useEffect(() => {
     setIdentity(getIdentity());
@@ -49,6 +60,7 @@ export default function LobbyPage() {
           identity,
           initialTimeSec: tc.sec,
           initialIncSec: tc.inc,
+          rating: myRating,
           onPlayers: (p) => {
             if (!mounted) return;
             setPlayers(p);
@@ -211,7 +223,14 @@ export default function LobbyPage() {
                 </div>
               ) : (
                 <>
-                  <span className="font-display text-lg text-gold-leaf">{identity?.name ?? "…"}</span>
+                  <span className="font-display text-lg text-gold-leaf">
+                    {identity?.name ?? "…"}
+                    {myRating !== undefined && (
+                      <span className="ml-2 text-sm font-mono text-parchment-300/80">
+                        ({Math.round(myRating)})
+                      </span>
+                    )}
+                  </span>
                   <button
                     onClick={() => {
                       setDraftName(identity?.name ?? "");

@@ -24,12 +24,24 @@
 import type { Move } from "@/engine/types";
 
 export type MPMessage =
-  | { type: "init"; whiteDrawbackId: string; blackDrawbackId: string; seed: number; timeSec: number; incSec?: number; rated?: boolean; whiteId?: string; blackId?: string }
+  | {
+      type: "init";
+      whiteDrawbackId: string;
+      blackDrawbackId: string;
+      seed: number;
+      timeSec: number;
+      incSec?: number;
+      whiteId?: string;
+      whiteName?: string;
+      blackId?: string;
+      blackName?: string;
+    }
   | { type: "move"; move: Move }
   | { type: "resign" }
   | { type: "rematch-offer" }
   | { type: "rematch-accept" }
   | { type: "rematch-decline" }
+  | { type: "peer-info"; id: string; name: string }
   | { type: "ping" };
 
 export type MPEvent =

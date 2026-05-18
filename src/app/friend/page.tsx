@@ -22,6 +22,8 @@ import { usePremoves } from "@/lib/premoves";
 import { isMuted, playCapture, playCheck, playMove as playMoveSfx, setMuted } from "@/lib/sounds";
 import { TimeControlPicker } from "@/components/TimeControlPicker";
 import { TimeControl } from "@/lib/timeControl";
+import { getIdentity, type Identity } from "@/lib/identity";
+import { recordGameResult, type PlayerRating } from "@/lib/ratings";
 
 type View = "setup" | "lobby" | "joining" | "game";
 
@@ -62,6 +64,14 @@ function FriendPage() {
   const [blackMs, setBlackMs] = useState(0);
   const [incSec, setIncSec] = useState(0);
   const [rematchState, setRematchState] = useState<"idle" | "offered" | "incoming" | "declined">("idle");
+  const [identity, setIdentity] = useState<Identity | null>(null);
+  const [opponentMeta, setOpponentMeta] = useState<{ id?: string; name?: string }>({});
+  const [ratingDelta, setRatingDelta] = useState<{ before: number; after: number } | null>(null);
+  const ratedRef = useRef(false);
+
+  useEffect(() => {
+    setIdentity(getIdentity());
+  }, []);
 
   const sessionRef = useRef<MPSession | null>(null);
   const clockEnabledRef = useRef(false);
@@ -135,6 +145,14 @@ function FriendPage() {
     lastInitSeedRef.current = msg.seed;
     setRematchState("idle");
     initHandledRef.current = true;
+    ratedRef.current = false;
+    setRatingDelta(null);
+    // Remember the opponent's identity (sent in the init via whiteId/blackId)
+    // so we can record a rated result when the game ends.
+    const oppColor = asColor === "w" ? "b" : "w";
+    const oppId = oppColor === "w" ? msg.whiteId : msg.blackId;
+    const oppName = (msg as any)[oppColor === "w" ? "whiteName" : "blackName"];
+    setOpponentMeta({ id: oppId, name: oppName });
     setView("game");
   };
 
@@ -143,15 +161,21 @@ function FriendPage() {
   // colors swap (their old guest becomes the new white).
   const startRematchAsBlackSide = () => {
     setRematchState("idle");
-    if (myColorRef.current !== "b") return; // the white side just waits
-    const tc = lastTcRef.current;
+    if (myColorRef.current !== "b") return;
+    const me = identity ?? getIdentity();
+    const tcc = lastTcRef.current;
     const init: Extract<MPMessage, { type: "init" }> = {
       type: "init",
       whiteDrawbackId: pickRandomDrawback().id,
       blackDrawbackId: pickRandomDrawback().id,
       seed: makeSeed(),
-      timeSec: tc.sec,
-      incSec: tc.inc,
+      timeSec: tcc.sec,
+      incSec: tcc.inc,
+      // I just played black; now I'm white. Opponent goes in black.
+      whiteId: me.id,
+      whiteName: me.name,
+      blackId: opponentMeta.id,
+      blackName: opponentMeta.name,
     };
     sessionRef.current?.send(init);
     startGameFromInit(init, "w");
@@ -203,6 +227,11 @@ function FriendPage() {
         // because the original-game host blasts the same init 4 times.
         if (lastInitSeedRef.current === e.message.seed) return;
         startGameFromInit(e.message, "b");
+        // Echo our identity back so the white side learns who we are.
+        const me = identity ?? getIdentity();
+        sess.send({ type: "peer-info", id: me.id, name: me.name });
+      } else if (e.type === "message" && e.message.type === "peer-info") {
+        setOpponentMeta({ id: e.message.id, name: e.message.name });
       } else if (e.type === "message" && e.message.type === "move") {
         // Opponent's move — apply locally, give them their increment.
         const incoming = e.message.move;
@@ -252,13 +281,11 @@ function FriendPage() {
 
   const handleCreate = async () => handleCreateWithCode(null, tc);
 
-  // If `presetCode` is given, host on that exact room code (used for the
-  // lobby-challenge flow where both sides know the code ahead of time).
-  // Otherwise the session generates a random one.
   const handleCreateWithCode = async (presetCode: string | null, useTc: TimeControl) => {
     setError(null);
     setCode("");
     setView("lobby");
+    const me = identity ?? getIdentity();
     const sess = new MPSession();
     sessionRef.current = sess;
     const init: Extract<MPMessage, { type: "init" }> = {
@@ -268,6 +295,9 @@ function FriendPage() {
       seed: makeSeed(),
       timeSec: useTc.sec,
       incSec: useTc.inc,
+      // Host plays white the first game; identity goes in the white slot.
+      whiteId: me.id,
+      whiteName: me.name,
     };
     wireSession(sess, "host", init);
     try {
@@ -363,6 +393,23 @@ function FriendPage() {
       setGame({ ...game });
     }
   }, [whiteMs, blackMs, game]);
+
+  // Apply Glicko-2 rating update once when a friend game ends. We only rate
+  // games where we have both identities (lobby-initiated games always do).
+  useEffect(() => {
+    if (!game?.result || ratedRef.current) return;
+    if (!identity || !opponentMeta.id || !opponentMeta.name) return;
+    ratedRef.current = true;
+    let score: 0 | 0.5 | 1;
+    if (game.result.winner === "draw") score = 0.5;
+    else if (game.result.winner === myColor) score = 1;
+    else score = 0;
+    recordGameResult(identity.id, identity.name, opponentMeta.id, opponentMeta.name, score)
+      .then((r: { me: PlayerRating; opp: PlayerRating; oldMe: { rating: number } }) => {
+        setRatingDelta({ before: r.oldMe.rating, after: r.me.rating });
+      })
+      .catch(() => {});
+  }, [game?.result, identity, opponentMeta, myColor]);
 
   const onResign = () => {
     if (!game || game.result) return;
@@ -580,6 +627,7 @@ function FriendPage() {
           rematchStatus={rematchState}
           onAcceptRematch={acceptRematch}
           onDeclineRematch={declineRematch}
+          ratingDelta={ratingDelta}
         />
       )}
     </main>

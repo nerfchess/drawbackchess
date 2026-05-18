@@ -21,6 +21,7 @@ interface Props {
   rematchStatus?: "idle" | "offered" | "incoming" | "declined";
   onAcceptRematch?: () => void;
   onDeclineRematch?: () => void;
+  ratingDelta?: { before: number; after: number } | null;
 }
 
 export function GameOver({
@@ -33,6 +34,7 @@ export function GameOver({
   rematchStatus,
   onAcceptRematch,
   onDeclineRematch,
+  ratingDelta,
 }: Props) {
   const won = result.winner === myColor;
   const draw = result.winner === "draw";
@@ -64,6 +66,19 @@ export function GameOver({
             {headline}
           </div>
           <div className="mt-2 text-sm text-parchment-300">{result.reason}</div>
+          {ratingDelta && (() => {
+            const diff = Math.round(ratingDelta.after - ratingDelta.before);
+            const after = Math.round(ratingDelta.after);
+            const sign = diff > 0 ? "+" : "";
+            const cls = diff > 0 ? "text-gold-leaf" : diff < 0 ? "text-oxblood-glow" : "text-parchment-300";
+            return (
+              <div className="mt-3 text-sm">
+                <span className="smallcaps text-[10px] text-parchment-400 mr-2">Rating</span>
+                <span className="font-mono">{after}</span>
+                <span className={"font-mono ml-2 " + cls}>({sign}{diff})</span>
+              </div>
+            );
+          })()}
         </div>
 
         <div className="mt-7 rule-ornament text-[11px]">
