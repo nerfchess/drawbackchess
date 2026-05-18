@@ -48,4 +48,12 @@ export interface Drawback {
     bannedSquares?: number[];
     highlightSquares?: number[];
   };
+
+  // Trackable progress for drawbacks tied to a counter (captures, moves, etc.).
+  // Returned as 0..1 fraction plus a short label like "2/3 pawns eaten".
+  progress?: (state: DrawbackState, ctx: GameContext) => null | {
+    value: number;
+    max: number;
+    label: string;
+  };
 }

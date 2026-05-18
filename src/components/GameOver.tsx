@@ -15,9 +15,10 @@ interface Props {
   blackDrawback: Drawback;
   myColor: Color;
   onRematch: () => void;
+  ratingChange?: { before: number; after: number } | null;
 }
 
-export function GameOver({ result, whiteDrawback, blackDrawback, myColor, onRematch }: Props) {
+export function GameOver({ result, whiteDrawback, blackDrawback, myColor, onRematch, ratingChange }: Props) {
   const won = result.winner === myColor;
   const draw = result.winner === "draw";
   const headline = draw ? "Draw" : won ? "You win!" : "You lose";
@@ -48,6 +49,19 @@ export function GameOver({ result, whiteDrawback, blackDrawback, myColor, onRema
             {headline}
           </div>
           <div className="mt-2 text-sm text-parchment-300">{result.reason}</div>
+          {ratingChange && (
+            <div className="mt-3 inline-flex items-center gap-3 px-4 py-1.5 rounded-full border border-gold/30 bg-gold/5">
+              <span className="smallcaps text-[10px] text-parchment-400">Your rating</span>
+              <span className="font-mono text-lg text-parchment">{Math.round(ratingChange.after)}</span>
+              {(() => {
+                const delta = Math.round(ratingChange.after - ratingChange.before);
+                if (delta === 0) return <span className="font-mono text-xs text-parchment-400">±0</span>;
+                const sign = delta > 0 ? "+" : "";
+                const tone = delta > 0 ? "text-gold-leaf" : "text-oxblood-glow";
+                return <span className={`font-mono text-xs ${tone}`}>{sign}{delta}</span>;
+              })()}
+            </div>
+          )}
         </div>
 
         <div className="mt-7 rule-ornament text-[11px]">

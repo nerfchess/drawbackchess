@@ -8,12 +8,13 @@ interface Props {
   revealed?: boolean;
   compact?: boolean;
   ownerLabel?: string;
+  progress?: { value: number; max: number; label: string } | null;
 }
 
 const TIER_LABEL = ["", "Trivial", "Easy", "Common", "Severe", "Brutal"];
 const TIER_ROMAN = ["", "I", "II", "III", "IV", "V"];
 
-export function DrawbackCard({ drawback, revealed = true, compact = false, ownerLabel }: Props) {
+export function DrawbackCard({ drawback, revealed = true, compact = false, ownerLabel, progress }: Props) {
   if (!revealed) {
     return (
       <div className="relative plate p-5 overflow-hidden">
@@ -59,6 +60,20 @@ export function DrawbackCard({ drawback, revealed = true, compact = false, owner
       <p className="text-[15px] leading-relaxed text-parchment/95">
         {drawback.description}
       </p>
+      {progress && progress.max > 0 && (
+        <div className="mt-3">
+          <div className="flex items-center justify-between mb-1">
+            <span className="smallcaps text-[10px] text-parchment-400">Progress</span>
+            <span className="font-mono text-[10px] text-parchment-300">{progress.label}</span>
+          </div>
+          <div className="h-1.5 bg-white/5 overflow-hidden">
+            <div
+              className={`h-full tier-bg-${drawback.tier}`}
+              style={{ width: `${Math.min(100, (progress.value / progress.max) * 100)}%` }}
+            />
+          </div>
+        </div>
+      )}
       {!compact && drawback.flavor && (
         <p className="mt-3 text-[13px] text-parchment-300/85 font-display border-l-2 border-white/15 pl-3">
           &ldquo;{drawback.flavor}&rdquo;

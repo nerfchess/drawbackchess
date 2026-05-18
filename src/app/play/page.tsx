@@ -2,8 +2,9 @@
 
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { PLAYABLE_DRAWBACKS } from "@/engine/drawbacks/library";
+import { loadRating } from "@/lib/rating";
 
 export default function PlayPage() {
   const router = useRouter();
@@ -12,6 +13,13 @@ export default function PlayPage() {
   const [drawbackId, setDrawbackId] = useState<string>("random");
   // Time control in seconds per side; 0 = unlimited (no clock)
   const [timeSec, setTimeSec] = useState<number>(600);
+  const [rating, setRating] = useState<number | null>(null);
+  const [games, setGames] = useState<number>(0);
+  useEffect(() => {
+    const r = loadRating();
+    setRating(Math.round(r.rating));
+    setGames(r.games);
+  }, []);
 
   const start = () => {
     const params = new URLSearchParams({
@@ -30,7 +38,17 @@ export default function PlayPage() {
         <Link href="/" className="font-display text-2xl tracking-tight">
           drawback<span className="text-gold-leaf">chess</span>
         </Link>
-        <Link href="/codex" className="px-3 py-1.5 rounded-full text-sm font-display hover:bg-white/5 text-parchment">Rules</Link>
+        <div className="flex items-center gap-3">
+          {rating != null && (
+            <div className="px-3 py-1.5 border border-gold/30 bg-gold/5 flex items-center gap-2 text-xs">
+              <span className="smallcaps text-[10px] text-parchment-400">Rating</span>
+              <span className="font-mono text-sm text-parchment">{rating}</span>
+              <span className="font-mono text-[10px] text-parchment-400">·</span>
+              <span className="font-mono text-[10px] text-parchment-400">{games}g</span>
+            </div>
+          )}
+          <Link href="/codex" className="px-3 py-1.5 rounded-full text-sm font-display hover:bg-white/5 text-parchment">Rules</Link>
+        </div>
       </nav>
 
       <section className="max-w-2xl mx-auto px-6 py-8">

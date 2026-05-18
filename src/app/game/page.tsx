@@ -23,6 +23,7 @@ import { cloneBoard, generateMoves, isInCheck, makeMove } from "@/engine/board";
 import type { QueuedPremove } from "@/components/Board";
 import { buildCustomDrawback, CustomDrawback } from "@/engine/drawbacks/custom";
 import { isMuted, playCapture, playCheck, playDrawback, playMove as playMoveSfx, setMuted } from "@/lib/sounds";
+import { applyResult, loadRating, saveRating } from "@/lib/rating";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -253,13 +254,20 @@ function GamePage() {
 
   // Drawback-triggered loss sound when game ends with a non-mundane reason.
   const sawResult = useRef(false);
+  const [ratingChange, setRatingChange] = useState<{ before: number; after: number } | null>(null);
   useEffect(() => {
     if (!game?.result || sawResult.current) return;
     sawResult.current = true;
     if (game.result.reason && game.result.reason.includes(":")) {
       playDrawback();
     }
-  }, [game?.result]);
+    const before = loadRating();
+    const score: 0 | 0.5 | 1 =
+      game.result.winner === "draw" ? 0.5 : game.result.winner === myColor ? 1 : 0;
+    const after = applyResult(before, difficulty, score);
+    saveRating(after);
+    setRatingChange({ before: before.rating, after: after.rating });
+  }, [game?.result, myColor, difficulty]);
 
   // Execute the head of the premove queue when our turn returns. If the head
   // is no longer playable (target ran away, piece pinned, friendly target
@@ -551,7 +559,10 @@ function GamePage() {
           )}
         </div>
         <aside className="space-y-4">
-          <DrawbackCard drawback={myDrawback} />
+          <DrawbackCard
+            drawback={myDrawback}
+            progress={myDrawback.progress?.(myState, myCtx) ?? null}
+          />
           <DrawbackCard drawback={opponentDrawback} revealed={!!game.result} />
           <MoveList moves={game.board.history} />
         </aside>
@@ -564,6 +575,7 @@ function GamePage() {
           blackDrawback={game.black.drawback}
           myColor={myColor}
           onRematch={handleRematch}
+          ratingChange={ratingChange}
         />
       )}
     </main>

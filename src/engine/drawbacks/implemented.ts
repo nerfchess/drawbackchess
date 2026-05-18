@@ -90,6 +90,10 @@ export const OUT_OF_BREATH: Drawback = db({
   tier: 2,
   icon: "wind",
   implemented: true,
+  progress: (state) => {
+    const s = state as { kingMoves: number };
+    return { value: s.kingMoves ?? 0, max: 1, label: `${s.kingMoves ?? 0}/1 king moves used` };
+  },
   init: () => ({ kingMoves: 0 }),
   filterMoves: (moves, state) => {
     const s = state as { kingMoves: number };
@@ -112,6 +116,10 @@ export const THREE_CHECK: Drawback = db({
   tier: 1,
   icon: "alert-triangle",
   implemented: true,
+  progress: (state) => {
+    const s = state as { checks: number };
+    return { value: s.checks ?? 0, max: 3, label: `${s.checks ?? 0}/3 checks taken` };
+  },
   init: () => ({ checks: 0 }),
   onTurnStart: (state, ctx) => {
     // If we start a turn in check, increment.
@@ -170,6 +178,11 @@ export const PACMAN: Drawback = db({
   tier: 3,
   icon: "circle-dot",
   implemented: true,
+  progress: (_s, ctx) => ({
+    value: ctx.capturedByMe.p,
+    max: 8,
+    label: `${ctx.capturedByMe.p}/8 pawns eaten`,
+  }),
   filterMoves: (moves) => {
     const pawnCaptures = moves.filter((m) => m.captured === "p");
     return pawnCaptures.length ? pawnCaptures : moves;
@@ -817,6 +830,13 @@ export const SIEGE: Drawback = db({
   tier: 4,
   icon: "sword",
   implemented: true,
+  progress: (_s, ctx) => ({
+    value: Math.min(ctx.capturedByMe.r, 1),
+    max: 1,
+    label: ctx.capturedByMe.r >= 1
+      ? "Siege complete"
+      : `${Math.max(0, 20 - ctx.moveNumber)} turns to take a rook`,
+  }),
   checkLoss: (_s, ctx) => {
     if (ctx.moveNumber < 20) return null;
     return ctx.capturedByMe.r >= 1 ? null : { reason: "failed siege" };

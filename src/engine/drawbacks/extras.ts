@@ -856,6 +856,17 @@ export const COUNTING_SHEEP: Drawback = db({
   tier: 4,
   icon: "list-ordered",
   implemented: true,
+  progress: (_s, ctx) => {
+    const counts: Record<PieceType, number> = { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 };
+    for (const m of ctx.board.history) if (m.color === ctx.me) counts[m.piece]++;
+    let max = 0;
+    let which: PieceType = "p";
+    for (const t of ["p", "n", "b", "r", "q", "k"] as PieceType[]) {
+      if (counts[t] > max) { max = counts[t]; which = t; }
+    }
+    const names: Record<PieceType, string> = { p: "pawns", n: "knights", b: "bishops", r: "rooks", q: "queens", k: "kings" };
+    return { value: Math.min(max, 5), max: 5, label: `${max}/5 ${names[which]} moved` };
+  },
   filterMoves: (moves, _s, ctx) => {
     const counts: Record<PieceType, number> = { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 };
     for (const m of ctx.board.history) if (m.color === ctx.me) counts[m.piece]++;
