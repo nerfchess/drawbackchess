@@ -49,6 +49,8 @@ interface DragState {
   from: Square;
   pointerId: number;
   cell: number; // pixel size of one square
+  piece: PieceType; // snapshot so the ghost survives an opponent capture mid-drag
+  color: Color;
 }
 
 export function Board({
@@ -166,6 +168,11 @@ export function Board({
   // Plain click / tap (no drag): toggle selection and play the move on the second tap.
   const handleSquareClick = (sq: Square) => {
     if (disabled) return;
+    // Click on the already-selected piece deselects it.
+    if (selected === sq) {
+      setSelected(null);
+      return;
+    }
     if (tryPlay(sq)) return;
     const piece = board.pieces[sq];
     if (piece && piece.color === myColor && movesFrom.has(sq)) {
@@ -190,7 +197,7 @@ export function Board({
 
     setSelected(sq);
     playSelect();
-    setDrag({ from: sq, pointerId: e.pointerId, cell });
+    setDrag({ from: sq, pointerId: e.pointerId, cell, piece: piece.type, color: piece.color });
     setHoverSq(sq);
     lastHoverRef.current = sq;
     // Pre-position the ghost so the first frame is right
@@ -272,7 +279,9 @@ export function Board({
   const inKingPass = (sq: Square) =>
     board.kingPassThrough.includes(sq) && board.kingPassColor !== myColor;
 
-  const draggedPiece = drag ? board.pieces[drag.from] : null;
+  // Use the snapshot from drag-start so the ghost survives if the underlying
+  // piece at drag.from is captured by the opponent mid-drag during premove.
+  const draggedPiece = drag ? { type: drag.piece, color: drag.color } : null;
 
   const handleContextMenu = (e: React.MouseEvent) => {
     // right-click cancels the whole premove queue (chess.com convention)

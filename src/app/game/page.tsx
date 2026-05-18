@@ -4,6 +4,7 @@ import { Board } from "@/components/Board";
 import { DrawbackCard } from "@/components/DrawbackCard";
 import { GameOver } from "@/components/GameOver";
 import { MoveList } from "@/components/MoveList";
+import { MaterialBar } from "@/components/MaterialBar";
 import { AILevel, pickAIMove } from "@/engine/ai";
 import { Drawback, DrawbackState, GameContext } from "@/engine/drawback";
 import { IMPLEMENTED_BY_ID, PLAYABLE_DRAWBACKS } from "@/engine/drawbacks/library";
@@ -561,6 +562,10 @@ function GamePage() {
             premoveMode={!isViewingHistory && premoveMode}
             premoves={isViewingHistory ? [] : validPremoves}
             onCancelPremove={cancelPremove}
+          />
+          <MaterialBar
+            board={isViewingHistory ? viewedBoard! : game.board}
+            myColor={myColor}
           />
           {isViewingHistory && (
             <div className="flex items-center justify-between gap-2 px-1">
