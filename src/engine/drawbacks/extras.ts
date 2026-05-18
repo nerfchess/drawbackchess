@@ -246,7 +246,7 @@ export const ASCETIC: Drawback = db({
   name: "Ascetic",
   description: "You can capture at most one piece per piece type.",
   flavor: "One vice each.",
-  tier: 4,
+  tier: 5,
   icon: "ban",
   implemented: true,
   filterMoves: (moves, _s, ctx) => {
@@ -566,23 +566,19 @@ export const HALL_OF_MIRRORS: Drawback = db({
 export const QUARANTINE: Drawback = db({
   id: "quarantine",
   name: "Quarantine",
-  description: "If your king is checked, all your pieces freeze for one turn after the check.",
+  description: "If your king is checked, only the king may move that turn. You can't move back to your first two ranks.",
   flavor: "Lock down.",
   tier: 4,
   icon: "biohazard",
   implemented: true,
   filterMoves: (moves, _s, ctx) => {
-    // If we WERE in check last turn (now resolved), restrict heavily.
-    const history = ctx.board.history;
-    // Check if opponent's most recent move delivered check that we just escaped from.
-    // Approximation: if our last move was a king move, allow normal play.
-    // Otherwise, if currently in check, only king moves allowed.
+    const homeRanks = ctx.me === "w" ? [0, 1] : [6, 7];
+    const noRetreat = moves.filter((m) => !homeRanks.includes(RANK(m.to)) || homeRanks.includes(RANK(m.from)));
     if (isInCheck(ctx.board, ctx.me)) {
-      const k = moves.filter((m) => m.piece === "k");
-      return k.length ? k : moves;
+      const k = noRetreat.filter((m) => m.piece === "k");
+      return k.length ? k : noRetreat;
     }
-    void history;
-    return moves;
+    return noRetreat;
   },
 });
 
@@ -768,7 +764,7 @@ export const SCHOLARSHIP: Drawback = db({
   name: "Scholarship",
   description: "You can only move a piece type after the opponent has moved it once.",
   flavor: "Learn first; then act.",
-  tier: 5,
+  tier: 3,
   icon: "book-open",
   implemented: true,
   filterMoves: (moves, _s, ctx) => {
@@ -855,15 +851,15 @@ export const ARMORY: Drawback = db({
 export const COUNTING_SHEEP: Drawback = db({
   id: "counting_sheep",
   name: "Counting Sheep",
-  description: "Once you've moved a piece type 3 times, you can't move it again.",
-  flavor: "Three's the limit.",
+  description: "Once you've moved a piece type 5 times, you can't move it again.",
+  flavor: "Five's the limit.",
   tier: 4,
   icon: "list-ordered",
   implemented: true,
   filterMoves: (moves, _s, ctx) => {
     const counts: Record<PieceType, number> = { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 };
     for (const m of ctx.board.history) if (m.color === ctx.me) counts[m.piece]++;
-    return moves.filter((m) => counts[m.piece] < 3);
+    return moves.filter((m) => counts[m.piece] < 5);
   },
 });
 
@@ -891,7 +887,6 @@ export const EXTRA_DRAWBACKS: Drawback[] = [
   CONSTRICTION,
   MIRROR_MARCH,
   RUSTY_KNIGHTS,
-  CLERGY,
   HEAVY_BOOTS,
   GOLDFISH,
   ASCETIC,
@@ -925,7 +920,6 @@ export const EXTRA_DRAWBACKS: Drawback[] = [
   PILGRIMAGE,
   SCHOLARSHIP,
   TRIBUTE,
-  COLD_FEET,
   SWITCHBACK,
   ARMORY,
   COUNTING_SHEEP,

@@ -166,6 +166,11 @@ export function Board({
   // Plain click / tap (no drag): toggle selection and play the move on the second tap.
   const handleSquareClick = (sq: Square) => {
     if (disabled) return;
+    // Clicking the already-selected piece deselects it.
+    if (selected === sq) {
+      setSelected(null);
+      return;
+    }
     if (tryPlay(sq)) return;
     const piece = board.pieces[sq];
     if (piece && piece.color === myColor && movesFrom.has(sq)) {

@@ -175,7 +175,7 @@ export const SEPARATION_CHURCH_STATE: Drawback = db({
 });
 
 export const ESCORT_MISSION: Drawback = db({
-  id: "escort_mission", name: "Escort Mission", tier: 2, implemented: true,
+  id: "escort_mission", name: "Escort Mission", tier: 1, implemented: true,
   description: "If your king can capture, it must.",
   filterMoves: (moves) => {
     const kingCaps = moves.filter((m) => m.piece === "k" && m.captured);
@@ -612,7 +612,7 @@ export const TORCHLIGHT: Drawback = db({
 });
 
 export const TURN_OTHER_CHEEK: Drawback = db({
-  id: "turn_other_cheek", name: "Turn the Other Cheek", tier: 3, implemented: true,
+  id: "turn_other_cheek", name: "Turn the Other Cheek", tier: 4, implemented: true,
   description: "Can't recapture.",
   filterMoves: (moves, _s, ctx) => {
     const last = ctx.opponentLastMove;
@@ -1126,7 +1126,7 @@ export const SUPERSTITIOUS: Drawback = db({
 });
 
 export const EAT_YOUR_VEGETABLES: Drawback = db({
-  id: "eat_your_vegetables", name: "Eat Your Vegetables", tier: 4, implemented: true,
+  id: "eat_your_vegetables", name: "Eat Your Vegetables", tier: 3, implemented: true,
   description: "Can't capture non-pawns until opponent has ≤ 4 pawns remaining.",
   filterMoves: (moves, _s, ctx) => {
     const opp = ctx.me === "w" ? "b" : "w";
@@ -1208,7 +1208,7 @@ export const CHECKERS: Drawback = db({
 });
 
 export const CLOSED_BOOK: Drawback = db({
-  id: "closed_book", name: "Closed Book", tier: 5, implemented: true,
+  id: "closed_book", name: "Closed Book", tier: 4, implemented: true,
   description: "Lose if you ever start a turn with an open file.",
   checkLoss: (_s, ctx) => {
     if (ctx.moveNumber === 0) return null;
@@ -1343,7 +1343,7 @@ function bestHeuristicMove(moves: Move[]): Move | null {
 }
 
 export const ICHTHYOPHOBE: Drawback = db({
-  id: "ichthyophobe", name: "Ichthyophobe", tier: 5, implemented: true,
+  id: "ichthyophobe", name: "Ichthyophobe", tier: 4, implemented: true,
   description: "Can't make the move Stockfish would make.",
   filterMoves: (moves) => {
     const best = bestHeuristicMove(moves);
@@ -1423,34 +1423,56 @@ export const RELAY_RACE: Drawback = db({
   },
 });
 
+function pickWorstMove(moves: Move[]): Move | null {
+  if (!moves.length) return null;
+  let worst = moves[0];
+  let worstScore = Infinity;
+  for (const m of moves) {
+    let s2 = 0;
+    if (m.captured) s2 -= PIECE_VAL[m.captured] * 10;
+    s2 += PIECE_VAL[m.piece];
+    const cf = Math.abs(FILE(m.to) - 3.5);
+    const cr = Math.abs(RANK(m.to) - 3.5);
+    s2 += cf + cr;
+    if (m.piece === "k") s2 -= 2;
+    if (s2 < worstScore) { worstScore = s2; worst = m; }
+  }
+  return worst;
+}
+
 export const DEVIL_ON_SHOULDER: Drawback = db({
   id: "devil_on_shoulder", name: "Devil on Your Shoulder", tier: 5, implemented: true,
-  description: "Disobey suggested bad moves 7 turns in a row → must obey on 8th.",
+  description: "Each turn the devil suggests a bad move. Ignore him 7 turns in a row and on the 8th you must obey.",
   init: () => ({ streak: 0 }),
-  onTurnStart: (_s, ctx) => {
-    let streak = 0;
-    for (let i = ctx.board.history.length - 1; i >= 0; i--) {
-      if (ctx.board.history[i].color !== ctx.me) continue;
-      streak++;
-      if (streak >= 7) break;
-    }
-    return { streak: streak % 8 };
+  onTurnStart: (state, ctx) => {
+    const prev = (state as { streak: number }).streak ?? 0;
+    const last = [...ctx.board.history].reverse().find((m) => m.color === ctx.me);
+    if (!last) return { streak: 0 };
+    return { streak: (prev + 1) % 8 };
   },
   filterMoves: (moves, state) => {
     const s = state as { streak: number };
     if (s.streak < 7) return moves;
-    // Force the worst-looking move (suggested "bad" move)
-    let worst = moves[0];
-    let worstScore = Infinity;
-    for (const m of moves) {
-      let s2 = 0;
-      if (m.captured) s2 += PIECE_VAL[m.captured] * 10 - PIECE_VAL[m.piece];
-      const cf = Math.abs(FILE(m.to) - 3.5);
-      const cr = Math.abs(RANK(m.to) - 3.5);
-      s2 -= cf + cr;
-      if (s2 < worstScore) { worstScore = s2; worst = m; }
+    const worst = pickWorstMove(moves);
+    return worst ? [worst] : moves;
+  },
+  hint: (state, _c, legal) => {
+    const s = state as { streak: number };
+    const worst = pickWorstMove(legal);
+    if (!worst) return null;
+    if (s.streak >= 7) {
+      return {
+        text: "The devil demands obedience this turn.",
+        squares: [worst.from, worst.to],
+        tone: "warn",
+      };
     }
-    return [worst];
+    const left = 7 - s.streak;
+    return {
+      text: `Devil whispers a bad move. Ignore ${left} more turn${left === 1 ? "" : "s"} or be forced to obey.`,
+      squares: [worst.from, worst.to],
+      tone: "info",
+    };
   },
 });
 
@@ -1853,9 +1875,9 @@ export const MORE_DRAWBACKS: Drawback[] = [
   HOPSCOTCH, LEAPS_AND_BOUNDS, COLORBLIND, INCHING_FORWARD, ICHTHYOPHOBE,
   LEFT_TO_RIGHT, FRIENDLY_FIRE, GOING_THE_DISTANCE, HELICOPTER_PARENT, EXCLUSIVITY_CLAUSE,
   RELAY_RACE, DEVIL_ON_SHOULDER, REFLECTIVE, OBSESSION, BOXING_WITH_SHADOW,
-  NOBLE_STEED, TAKING_TURNS, HAND_AND_GIGABRAIN, CRENELLATIONS, LEADING_THE_CHARGE,
-  ACTIVE_VOLCANO, NURTURER, PRINCE_CHARMING, ABSOLUTION, QUICKSAND,
+  NOBLE_STEED, CRENELLATIONS, LEADING_THE_CHARGE,
+  ACTIVE_VOLCANO, PRINCE_CHARMING, ABSOLUTION, QUICKSAND,
   ROOK_FAN_CLUB, LADIES_FIRST, BRIDGE_OVER_TROUBLED_WATER, ROYAL_BERTH, VELOCIRAPTOR,
-  SECRET_GARDEN, THUNDERDOME, INDECISIVE, UNREQUITED_LOVE, TORPEDOES,
+  THUNDERDOME, INDECISIVE, UNREQUITED_LOVE, TORPEDOES,
   THEOCRACY, BOTTLED_LIGHTNING,
 ];

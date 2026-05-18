@@ -59,7 +59,7 @@ export default function HomePage() {
           <FloatCard className="absolute bottom-12 left-6 sm:left-10 -rotate-2" delay={0.2}>
             <DrawbackCard drawback={RISING_WATER} />
           </FloatCard>
-          <FloatCard className="absolute bottom-0 right-2 sm:right-12 rotate-6" delay={0.3}>
+          <FloatCard className="absolute bottom-0 right-0 sm:right-2 rotate-6" delay={0.3}>
             <DrawbackCard drawback={PACMAN} />
           </FloatCard>
         </div>

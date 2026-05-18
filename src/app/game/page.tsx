@@ -541,6 +541,7 @@ function GamePage() {
             premoves={validPremoves}
             onCancelPremove={cancelPremove}
           />
+          <MaterialBar board={virtualBoard ?? game.board} myColor={myColor} />
           {clockEnabled && (
             <ClockPill
               label="You"
@@ -566,6 +567,49 @@ function GamePage() {
         />
       )}
     </main>
+  );
+}
+
+function MaterialBar({ board, myColor }: { board: BoardState; myColor: Color }) {
+  const VAL: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
+  const START: Record<string, number> = { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 };
+  const counts: Record<Color, Record<string, number>> = {
+    w: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
+    b: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
+  };
+  for (const p of board.pieces) {
+    if (!p) continue;
+    counts[p.color][p.type]++;
+  }
+  const opp: Color = myColor === "w" ? "b" : "w";
+  let myAdv = 0;
+  for (const t of ["p", "n", "b", "r", "q"]) {
+    myAdv += (counts[myColor][t] - counts[opp][t]) * VAL[t];
+  }
+  const myCaptured: string[] = [];
+  const oppCaptured: string[] = [];
+  for (const t of ["q", "r", "b", "n", "p"]) {
+    const myLost = Math.max(0, START[t] - counts[myColor][t]);
+    const oppLost = Math.max(0, START[t] - counts[opp][t]);
+    const symMap: Record<string, string> = { p: "♟", n: "♞", b: "♝", r: "♜", q: "♛" };
+    for (let i = 0; i < oppLost; i++) myCaptured.push(symMap[t]);
+    for (let i = 0; i < myLost; i++) oppCaptured.push(symMap[t]);
+  }
+  const label = myAdv === 0 ? "even" : myAdv > 0 ? `+${myAdv}` : `${myAdv}`;
+  return (
+    <div className="plate p-2 px-3 flex items-center justify-between text-sm">
+      <div className="flex items-center gap-2 min-w-0">
+        <span className="smallcaps text-[10px] text-parchment-400">You</span>
+        <span className="text-parchment-200 truncate font-mono text-base leading-none">{myCaptured.join("")}</span>
+      </div>
+      <span className={"font-mono font-semibold text-base " + (myAdv > 0 ? "text-gold-leaf" : myAdv < 0 ? "text-oxblood-glow" : "text-parchment-400")}>
+        {label}
+      </span>
+      <div className="flex items-center gap-2 min-w-0 justify-end">
+        <span className="text-parchment-200 truncate font-mono text-base leading-none">{oppCaptured.join("")}</span>
+        <span className="smallcaps text-[10px] text-parchment-400">Opp</span>
+      </div>
+    </div>
   );
 }
 
