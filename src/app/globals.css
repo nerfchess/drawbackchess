@@ -163,8 +163,12 @@ body {
 .btn-ghost:hover { background: rgba(236,231,214,0.07); border-color: rgba(236,231,214,0.30); }
 
 /* --- Board treatments: warm wood-tone, less candy than chess.com green --- */
-.sq-light { background-color: #e8dcc0; }
-.sq-dark  { background-color: #8d6e4b; }
+:root {
+  --sq-light: #e8dcc0;
+  --sq-dark: #8d6e4b;
+}
+.sq-light { background-color: var(--sq-light); }
+.sq-dark  { background-color: var(--sq-dark); }
 /* Selection: thick brass ring + light wash, so the piece stays readable on top */
 .sq-sel {
   box-shadow:

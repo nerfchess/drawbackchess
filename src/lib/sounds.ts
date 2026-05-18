@@ -5,6 +5,25 @@
 let ctx: AudioContext | null = null;
 let muted = false;
 let noiseBuf: AudioBuffer | null = null;
+let volume = 0.8;
+
+export function setVolume(v: number) {
+  volume = Math.max(0, Math.min(1, v));
+  if (typeof window !== "undefined") {
+    try {
+      localStorage.setItem("dc:volume", String(volume));
+    } catch {}
+  }
+}
+
+export function getVolume(): number {
+  if (typeof window === "undefined") return volume;
+  try {
+    const s = localStorage.getItem("dc:volume");
+    if (s !== null) volume = Math.max(0, Math.min(1, parseFloat(s) || 0));
+  } catch {}
+  return volume;
+}
 
 function audio(): AudioContext | null {
   if (typeof window === "undefined") return null;
@@ -75,7 +94,7 @@ function knock(opts: KnockOpts) {
   const t0 = a.currentTime + (opts.delay ?? 0);
 
   const master = a.createGain();
-  master.gain.value = opts.master ?? 1.0;
+  master.gain.value = (opts.master ?? 1.0) * getVolume();
   master.connect(a.destination);
 
   // --- Filtered noise burst (the "click") ---
