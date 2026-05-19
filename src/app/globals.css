@@ -12,6 +12,9 @@
   --oxblood: #b54641;
   --verdigris: #5a9b7a;
   --bruise: #7c7aa3;
+  --font-display: Georgia, "Iowan Old Style", "Palatino Linotype", serif;
+  --font-body: "Segoe UI", Inter, system-ui, sans-serif;
+  --font-mono: "Cascadia Mono", "JetBrains Mono", Consolas, monospace;
 }
 
 html, body {
