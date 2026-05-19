@@ -5,7 +5,7 @@
 import type { Move } from "@/engine/types";
 
 export type MPMessage =
-  | { type: "init"; whiteDrawbackId: string; blackDrawbackId: string; seed: number; timeSec: number }
+  | { type: "init"; whiteDrawbackId: string; blackDrawbackId: string; seed: number; timeSec: number; incrementSec?: number }
   | { type: "move"; move: Move }
   | { type: "resign" }
   | { type: "ping" };

@@ -120,6 +120,10 @@ function GamePage() {
     const t = parseInt(params.get("t") ?? "0", 10);
     return Number.isFinite(t) && t > 0 ? t * 1000 : 0;
   }, [params]);
+  const incrementMs = useMemo(() => {
+    const inc = parseInt(params.get("inc") ?? "0", 10);
+    return Number.isFinite(inc) && inc > 0 ? inc * 1000 : 0;
+  }, [params]);
   const clockEnabled = initialTimeMs > 0;
 
   const myColor: Color = useMemo(() => {
@@ -138,6 +142,12 @@ function GamePage() {
   const [blackMs, setBlackMs] = useState(initialTimeMs);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const aiThinking = useRef(false);
+
+  const addIncrement = (color: Color) => {
+    if (!clockEnabled || incrementMs <= 0) return;
+    if (color === "w") setWhiteMs((t) => t + incrementMs);
+    else setBlackMs((t) => t + incrementMs);
+  };
 
   useEffect(() => {
     setMutedState(isMuted());
@@ -298,10 +308,11 @@ function GamePage() {
     const tid = setTimeout(() => {
       const next = playMove(game, m);
       setGame({ ...next });
+      addIncrement(myColor);
       setPremoves((q) => q.slice(1));
     }, 90);
     return () => clearTimeout(tid);
-  }, [game, premoves, moves, myColor]);
+  }, [game, premoves, moves, myColor, clockEnabled, incrementMs]);
 
   // Clock tick — decrement the active side's clock at 100ms intervals while the
   // game is live. The actual loss check is in a separate effect so we don't
@@ -341,8 +352,10 @@ function GamePage() {
     const tid = setTimeout(() => {
       const m = pickAIMove(game, difficulty);
       if (m) {
+        const mover = game.board.turn;
         const next = playMove(game, m);
         setGame({ ...next });
+        addIncrement(mover);
       } else {
         game.result = { winner: myColor, reason: "AI has no legal moves" };
         setGame({ ...game });
@@ -354,7 +367,7 @@ function GamePage() {
       clearTimeout(tid);
       aiThinking.current = false;
     };
-  }, [game, myColor, difficulty]);
+  }, [game, myColor, difficulty, clockEnabled, incrementMs]);
 
   if (!game) {
     return <LoadingPanel />;
@@ -382,6 +395,7 @@ function GamePage() {
     }
     const next = playMove(game, m);
     setGame({ ...next });
+    addIncrement(myColor);
   };
 
   const cancelPremove = () => setPremoves([]);

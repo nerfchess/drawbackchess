@@ -6,13 +6,31 @@ import { useEffect, useState } from "react";
 import { PLAYABLE_DRAWBACKS } from "@/engine/drawbacks/library";
 import { loadRating } from "@/lib/rating";
 
+const TIME_STEPS_SEC = [
+  5,
+  10,
+  15,
+  20,
+  30,
+  45,
+  60,
+  90,
+  120,
+  150,
+  180,
+  ...range(5 * 60, 10 * 60, 60),
+  ...range(12 * 60, 30 * 60, 2 * 60),
+  ...range(35 * 60, 2 * 60 * 60, 5 * 60),
+];
+
 export default function PlayPage() {
   const router = useRouter();
   const [difficulty, setDifficulty] = useState<"easy" | "medium" | "hard">("medium");
   const [color, setColor] = useState<"w" | "b" | "random">("random");
   const [drawbackId, setDrawbackId] = useState<string>("random");
-  // Time control in seconds per side; 0 = unlimited (no clock)
-  const [timeSec, setTimeSec] = useState<number>(600);
+  // Time control in seconds; base = 0 means unlimited (no clock).
+  const [baseSec, setBaseSec] = useState<number>(10 * 60);
+  const [incrementSec, setIncrementSec] = useState<number>(0);
   const [rating, setRating] = useState<number | null>(null);
   const [games, setGames] = useState<number>(0);
   useEffect(() => {
@@ -27,7 +45,8 @@ export default function PlayPage() {
       difficulty,
       color,
       drawback: drawbackId,
-      t: String(timeSec),
+      t: String(baseSec),
+      inc: String(incrementSec),
     });
     router.push(`/game?${params.toString()}`);
   };
@@ -87,19 +106,24 @@ export default function PlayPage() {
             <Pill selected={color === "b"} onClick={() => setColor("b")}>Black</Pill>
           </Group>
 
-          <Group label="Time per side">
-            {([
-              { s: 0, l: "Unlimited" },
-              { s: 180, l: "3 min" },
-              { s: 300, l: "5 min" },
-              { s: 600, l: "10 min" },
-              { s: 1800, l: "30 min" },
-            ] as const).map(({ s, l }) => (
-              <Pill key={s} selected={timeSec === s} onClick={() => setTimeSec(s)}>
-                {l}
-              </Pill>
-            ))}
-          </Group>
+          <div className="space-y-4">
+            <TimeSlider
+              label="Time per Side"
+              value={baseSec}
+              values={[0, ...TIME_STEPS_SEC]}
+              display={baseSec === 0 ? "Unlimited" : formatTimeControl(baseSec)}
+              formatEdgeLabel={formatTimeControl}
+              onChange={setBaseSec}
+            />
+            <TimeSlider
+              label="Increment (Seconds)"
+              value={incrementSec}
+              values={range(0, 30, 1)}
+              display={String(incrementSec)}
+              disabled={baseSec === 0}
+              onChange={setIncrementSec}
+            />
+          </div>
 
           <Group label="Your secret rule">
             <Pill selected={drawbackId === "random"} onClick={() => setDrawbackId("random")}>
@@ -146,6 +170,63 @@ export default function PlayPage() {
         </div>
       </section>
     </main>
+  );
+}
+
+function range(start: number, end: number, step: number) {
+  const values: number[] = [];
+  for (let value = start; value <= end; value += step) {
+    values.push(value);
+  }
+  return values;
+}
+
+function formatTimeControl(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSec = seconds % 60;
+  return `${minutes}:${remainingSec.toString().padStart(2, "0")}`;
+}
+
+function TimeSlider({
+  label,
+  value,
+  values,
+  display,
+  disabled = false,
+  formatEdgeLabel = String,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  values: number[];
+  display: string;
+  disabled?: boolean;
+  formatEdgeLabel?: (value: number) => string;
+  onChange: (value: number) => void;
+}) {
+  const index = Math.max(0, values.indexOf(value));
+
+  return (
+    <div className={disabled ? "opacity-50" : ""}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="smallcaps text-[11px] text-parchment-400">{label}</div>
+        <div className="font-mono text-sm text-gold-leaf tabular-nums">{display}</div>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={values.length - 1}
+        step={1}
+        value={index}
+        disabled={disabled}
+        onChange={(e) => onChange(values[Number(e.target.value)])}
+        className="w-full accent-gold-leaf disabled:cursor-not-allowed"
+      />
+      <div className="mt-1 flex justify-between font-mono text-[10px] text-parchment-400">
+        <span>{formatEdgeLabel(values[0])}</span>
+        <span>{formatEdgeLabel(values[values.length - 1])}</span>
+      </div>
+    </div>
   );
 }
 

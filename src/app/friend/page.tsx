@@ -21,6 +21,23 @@ import { isMuted, playCapture, playCheck, playMove as playMoveSfx, setMuted } fr
 
 type View = "setup" | "lobby" | "joining" | "game";
 
+const TIME_STEPS_SEC = [
+  5,
+  10,
+  15,
+  20,
+  30,
+  45,
+  60,
+  90,
+  120,
+  150,
+  180,
+  ...range(5 * 60, 10 * 60, 60),
+  ...range(12 * 60, 30 * 60, 2 * 60),
+  ...range(35 * 60, 2 * 60 * 60, 5 * 60),
+];
+
 function pickRandomDrawback() {
   const pool = PLAYABLE_DRAWBACKS.filter((d) => d.id !== "lucky");
   return pool[Math.floor(Math.random() * pool.length)];
@@ -39,7 +56,8 @@ export default function FriendPage() {
   const [view, setView] = useState<View>("setup");
   const [code, setCode] = useState("");
   const [joinCode, setJoinCode] = useState("");
-  const [timeSec, setTimeSec] = useState(600);
+  const [baseSec, setBaseSec] = useState(600);
+  const [incrementSec, setIncrementSec] = useState(0);
   const [error, setError] = useState<string | null>(null);
   const [muted, setMutedState] = useState(false);
 
@@ -51,6 +69,7 @@ export default function FriendPage() {
 
   const sessionRef = useRef<MPSession | null>(null);
   const clockEnabledRef = useRef(false);
+  const incrementMsRef = useRef(0);
 
   useEffect(() => setMutedState(isMuted()), []);
 
@@ -73,8 +92,15 @@ export default function FriendPage() {
     setWhiteMs(msg.timeSec * 1000);
     setBlackMs(msg.timeSec * 1000);
     clockEnabledRef.current = msg.timeSec > 0;
+    incrementMsRef.current = (msg.incrementSec ?? 0) * 1000;
     lastSentCount.current = 0;
     setView("game");
+  };
+
+  const addIncrement = (color: Color) => {
+    if (!clockEnabledRef.current || incrementMsRef.current <= 0) return;
+    if (color === "w") setWhiteMs((t) => t + incrementMsRef.current);
+    else setBlackMs((t) => t + incrementMsRef.current);
   };
 
   // Set up the session event handler. We do this once a session exists so we
@@ -105,7 +131,9 @@ export default function FriendPage() {
               (x.promotion ?? null) === (incoming.promotion ?? null),
           );
           if (!lm) return g;
+          const mover = g.board.turn;
           const next = playMove(g, lm);
+          addIncrement(mover);
           if (lm.captured) playCapture();
           else playMoveSfx();
           if (isInCheck(next.board, next.board.turn)) setTimeout(playCheck, 80);
@@ -131,7 +159,8 @@ export default function FriendPage() {
       whiteDrawbackId: pickRandomDrawback().id,
       blackDrawbackId: pickRandomDrawback().id,
       seed: makeSeed(),
-      timeSec,
+      timeSec: baseSec,
+      incrementSec,
     };
     wireSession(sess, "host", init);
     try {
@@ -180,6 +209,7 @@ export default function FriendPage() {
     if (!lm) return;
     const next = playMove(game, lm);
     setGame({ ...next });
+    addIncrement(myColor);
     sessionRef.current?.send({ type: "move", move: lm });
     if (lm.captured) playCapture();
     else playMoveSfx();
@@ -205,6 +235,7 @@ export default function FriendPage() {
     const tid = setTimeout(() => {
       const next = playMove(game, m);
       setGame({ ...next });
+      addIncrement(myColor);
       setPremoves((q) => q.slice(1));
       sessionRef.current?.send({ type: "move", move: m });
       if (m.captured) playCapture();
@@ -273,30 +304,23 @@ export default function FriendPage() {
           )}
 
           <div className="mt-8 plate p-6 sm:p-7 space-y-6">
-            <div>
-              <div className="smallcaps text-[11px] text-parchment-400 mb-2">Time per side</div>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { s: 0, l: "Unlimited" },
-                  { s: 180, l: "3 min" },
-                  { s: 300, l: "5 min" },
-                  { s: 600, l: "10 min" },
-                  { s: 1800, l: "30 min" },
-                ].map(({ s, l }) => (
-                  <button
-                    key={s}
-                    onClick={() => setTimeSec(s)}
-                    className={
-                      "px-3 py-1.5 rounded-full text-xs font-display transition border " +
-                      (timeSec === s
-                        ? "bg-gold/20 border-gold text-gold-leaf"
-                        : "border-white/15 text-parchment-300 hover:border-white/30")
-                    }
-                  >
-                    {l}
-                  </button>
-                ))}
-              </div>
+            <div className="space-y-4">
+              <TimeSlider
+                label="Time per Side"
+                value={baseSec}
+                values={[0, ...TIME_STEPS_SEC]}
+                display={baseSec === 0 ? "Unlimited" : formatTimeControl(baseSec)}
+                formatEdgeLabel={formatTimeControl}
+                onChange={setBaseSec}
+              />
+              <TimeSlider
+                label="Increment (Seconds)"
+                value={incrementSec}
+                values={range(0, 30, 1)}
+                display={String(incrementSec)}
+                disabled={baseSec === 0}
+                onChange={setIncrementSec}
+              />
             </div>
 
             <button
@@ -451,6 +475,63 @@ export default function FriendPage() {
         />
       )}
     </main>
+  );
+}
+
+function range(start: number, end: number, step: number) {
+  const values: number[] = [];
+  for (let value = start; value <= end; value += step) {
+    values.push(value);
+  }
+  return values;
+}
+
+function formatTimeControl(seconds: number) {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSec = seconds % 60;
+  return `${minutes}:${remainingSec.toString().padStart(2, "0")}`;
+}
+
+function TimeSlider({
+  label,
+  value,
+  values,
+  display,
+  disabled = false,
+  formatEdgeLabel = String,
+  onChange,
+}: {
+  label: string;
+  value: number;
+  values: number[];
+  display: string;
+  disabled?: boolean;
+  formatEdgeLabel?: (value: number) => string;
+  onChange: (value: number) => void;
+}) {
+  const index = Math.max(0, values.indexOf(value));
+
+  return (
+    <div className={disabled ? "opacity-50" : ""}>
+      <div className="flex items-center justify-between mb-2">
+        <div className="smallcaps text-[11px] text-parchment-400">{label}</div>
+        <div className="font-mono text-sm text-gold-leaf tabular-nums">{display}</div>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={values.length - 1}
+        step={1}
+        value={index}
+        disabled={disabled}
+        onChange={(e) => onChange(values[Number(e.target.value)])}
+        className="w-full accent-gold-leaf disabled:cursor-not-allowed"
+      />
+      <div className="mt-1 flex justify-between font-mono text-[10px] text-parchment-400">
+        <span>{formatEdgeLabel(values[0])}</span>
+        <span>{formatEdgeLabel(values[values.length - 1])}</span>
+      </div>
+    </div>
   );
 }
 
