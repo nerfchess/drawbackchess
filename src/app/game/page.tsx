@@ -25,6 +25,7 @@ import { buildCustomDrawback, CustomDrawback } from "@/engine/drawbacks/custom";
 import { isMuted, playCapture, playCheck, playDrawback, playMove as playMoveSfx, setMuted } from "@/lib/sounds";
 import { applyResult, loadRating, saveRating } from "@/lib/rating";
 import { SettingsPanel } from "@/components/SettingsPanel";
+import { loadSavedAiGame, restoreSavedAiGame, saveAiGame } from "@/lib/gamePersistence";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Suspense, useEffect, useMemo, useRef, useState } from "react";
@@ -112,6 +113,7 @@ function LoadingPanel() {
 function GamePage() {
   const router = useRouter();
   const params = useSearchParams();
+  const querySignature = params.toString();
   const difficulty = (params.get("difficulty") ?? "medium") as AILevel;
   const myColorParam = params.get("color") ?? "random";
   const myDrawbackId = params.get("drawback") ?? "random";
@@ -126,11 +128,11 @@ function GamePage() {
   }, [params]);
   const clockEnabled = initialTimeMs > 0;
 
-  const myColor: Color = useMemo(() => {
+  const [myColor, setMyColor] = useState<Color>(() => {
     if (myColorParam === "w") return "w";
     if (myColorParam === "b") return "b";
     return Math.random() < 0.5 ? "w" : "b";
-  }, [myColorParam]);
+  });
 
   const [game, setGame] = useState<DrawbackGame | null>(null);
   const [, force] = useState(0);
@@ -142,6 +144,8 @@ function GamePage() {
   const [blackMs, setBlackMs] = useState(initialTimeMs);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const aiThinking = useRef(false);
+  const whiteCustomSpec = useRef<CustomDrawback | null>(null);
+  const blackCustomSpec = useRef<CustomDrawback | null>(null);
 
   const addIncrement = (color: Color) => {
     if (!clockEnabled || incrementMs <= 0) return;
@@ -154,11 +158,32 @@ function GamePage() {
   }, []);
 
   useEffect(() => {
+    const saved = loadSavedAiGame(querySignature);
+    if (saved) {
+      const restored = restoreSavedAiGame(saved);
+      if (restored) {
+        setMyColor(saved.myColor);
+        setGame(restored);
+        setWhiteMs(saved.whiteMs);
+        setBlackMs(saved.blackMs);
+        setPremoves(saved.premoves ?? []);
+        whiteCustomSpec.current =
+          saved.game.white.drawback.kind === "custom" ? saved.game.white.drawback.spec : null;
+        blackCustomSpec.current =
+          saved.game.black.drawback.kind === "custom" ? saved.game.black.drawback.spec : null;
+        lastSeenMoveCount.current = restored.board.history.length;
+        sawResult.current = !!restored.result;
+        return;
+      }
+    }
+
     let myDb: Drawback;
+    let myCustomSpec: CustomDrawback | null = null;
     if (myDrawbackId === "__custom__") {
       try {
         const raw = sessionStorage.getItem("dc:active-custom");
         const spec = raw ? (JSON.parse(raw) as CustomDrawback) : null;
+        myCustomSpec = spec;
         myDb = spec ? buildCustomDrawback(spec) : pickRandomDrawback();
       } catch {
         myDb = pickRandomDrawback();
@@ -171,9 +196,25 @@ function GamePage() {
     const aiDb = pickRandomDrawback();
     const wDb = myColor === "w" ? myDb : aiDb;
     const bDb = myColor === "w" ? aiDb : myDb;
+    whiteCustomSpec.current = myColor === "w" ? myCustomSpec : null;
+    blackCustomSpec.current = myColor === "w" ? null : myCustomSpec;
     setGame(newGame(wDb, bDb, makeSeed()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!game) return;
+    saveAiGame({
+      query: querySignature,
+      myColor,
+      game,
+      whiteMs,
+      blackMs,
+      premoves,
+      whiteCustomSpec: whiteCustomSpec.current,
+      blackCustomSpec: blackCustomSpec.current,
+    });
+  }, [game, querySignature, myColor, whiteMs, blackMs, premoves]);
 
   const moves = useMemo(() => (game ? legalMoves(game) : []), [game]);
 
