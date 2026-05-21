@@ -163,21 +163,15 @@ export function Board({
     return false;
   };
 
-  // Plain click / tap (no drag): toggle selection and play the move on the second tap.
+  // Plain click / tap: keep a selected piece's legal moves visible until the
+  // user selects another movable piece or plays a legal destination.
   const handleSquareClick = (sq: Square) => {
     if (disabled) return;
-    // Clicking the already-selected piece deselects it.
-    if (selected === sq) {
-      setSelected(null);
-      return;
-    }
     if (tryPlay(sq)) return;
     const piece = board.pieces[sq];
-    if (piece && piece.color === myColor && movesFrom.has(sq)) {
+    if (piece && piece.color === myColor && movesFrom.has(sq) && selected !== sq) {
       setSelected(sq);
       playSelect();
-    } else {
-      setSelected(null);
     }
   };
 

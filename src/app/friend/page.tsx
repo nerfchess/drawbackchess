@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { Board, QueuedPremove } from "@/components/Board";
 import { DrawbackCard } from "@/components/DrawbackCard";
 import { GameOver } from "@/components/GameOver";
@@ -16,6 +16,7 @@ import {
 } from "@/engine/game";
 import { makeSeed } from "@/engine/rng";
 import { Color, Move } from "@/engine/types";
+import { boardAtPly } from "@/lib/gameReview";
 import { MPMessage, MPSession } from "@/lib/multiplayer";
 import { isMuted, playCapture, playCheck, playMove as playMoveSfx, setMuted } from "@/lib/sounds";
 
@@ -66,8 +67,11 @@ export default function FriendPage() {
   const [whiteMs, setWhiteMs] = useState(0);
   const [blackMs, setBlackMs] = useState(0);
   const [premoves, setPremoves] = useState<QueuedPremove[]>([]);
+  const [historyPly, setHistoryPly] = useState<number | null>(null);
+  const [boardHeight, setBoardHeight] = useState<number | null>(null);
 
   const sessionRef = useRef<MPSession | null>(null);
+  const boardShellRef = useRef<HTMLDivElement | null>(null);
   const clockEnabledRef = useRef(false);
   const incrementMsRef = useRef(0);
 
@@ -91,6 +95,7 @@ export default function FriendPage() {
     setMyColor(asColor);
     setWhiteMs(msg.timeSec * 1000);
     setBlackMs(msg.timeSec * 1000);
+    setHistoryPly(null);
     clockEnabledRef.current = msg.timeSec > 0;
     incrementMsRef.current = (msg.incrementSec ?? 0) * 1000;
     lastSentCount.current = 0;
@@ -194,8 +199,43 @@ export default function FriendPage() {
 
   const moves = useMemo(() => (game ? legalMoves(game) : []), [game]);
 
+  useEffect(() => {
+    if (!game || !clockEnabledRef.current) return;
+    const shell = boardShellRef.current;
+    const boardEl = shell?.firstElementChild;
+    if (!boardEl) return;
+    const syncHeight = () => setBoardHeight(boardEl.getBoundingClientRect().height);
+    syncHeight();
+    const observer = new ResizeObserver(syncHeight);
+    observer.observe(boardEl);
+    return () => observer.disconnect();
+  }, [game]);
+
+  useEffect(() => {
+    if (!game || historyPly == null) return;
+    if (historyPly > game.board.history.length) {
+      setHistoryPly(game.board.history.length);
+    }
+  }, [game, historyPly]);
+
+  const reviewBoard = useMemo(() => {
+    if (!game || historyPly == null) return null;
+    return boardAtPly(game.board.history, historyPly);
+  }, [game, historyPly]);
+  const currentHistoryPly = historyPly ?? game?.board.history.length ?? 0;
+  const isReviewingHistory = historyPly != null;
+  const handleHistoryPlyChange = (ply: number) => {
+    const max = game?.board.history.length ?? 0;
+    if (ply >= max) {
+      setHistoryPly(null);
+    } else {
+      setHistoryPly(Math.max(0, ply));
+      setPremoves([]);
+    }
+  };
+
   const handleLocalMove = (m: Move) => {
-    if (!game || game.result) return;
+    if (!game || game.result || isReviewingHistory) return;
     if (game.board.turn !== myColor) {
       setPremoves((q) => [
         ...q,
@@ -279,6 +319,7 @@ export default function FriendPage() {
     sessionRef.current = null;
     setGame(null);
     setPremoves([]);
+    setHistoryPly(null);
     setView("setup");
     setCode("");
     setJoinCode("");
@@ -413,13 +454,19 @@ export default function FriendPage() {
   const myDrawback = myColor === "w" ? game.white.drawback : game.black.drawback;
   const opponentDrawback = myColor === "w" ? game.black.drawback : game.white.drawback;
   const lastMove = game.board.history[game.board.history.length - 1] ?? null;
+  const boardForDisplay = reviewBoard ?? game.board;
+  const lastMoveForDisplay = isReviewingHistory
+    ? game.board.history[currentHistoryPly - 1] ?? null
+    : lastMove;
+  const railHeightStyle = boardHeight
+    ? ({ "--board-height": `${boardHeight}px` } as CSSProperties)
+    : undefined;
 
   return (
     <main className="min-h-screen pb-12">
       <SiteNav />
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 grid lg:grid-cols-[1fr_340px] gap-6">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-sm">
+      <div className="max-w-[1500px] mx-auto px-3 sm:px-6 space-y-4">
+        <div className="flex items-center justify-between text-sm">
             <span className="font-display text-parchment-200">
               <span className="smallcaps text-[11px] text-parchment-400 mr-2">vs Friend</span>
               <span className="text-gold-leaf font-semibold">{code || joinCode}</span>
@@ -431,38 +478,59 @@ export default function FriendPage() {
               Resign
             </button>
           </div>
-          {clockEnabledRef.current && (
-            <ClockPill
-              label="Opponent"
-              ms={myColor === "w" ? blackMs : whiteMs}
-              active={!game.result && game.board.turn !== myColor}
+        <div className="grid gap-y-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-x-6">
+          <aside className="grid gap-4 lg:grid-rows-[auto_1fr_auto] lg:self-stretch">
+            <DrawbackCard drawback={opponentDrawback} revealed={!!game.result} />
+            <div className="hidden lg:block" />
+            <DrawbackCard drawback={myDrawback} />
+          </aside>
+          <div className="flex flex-col sm:flex-row sm:items-stretch gap-3">
+            <div ref={boardShellRef} className="min-w-0 flex-1">
+              <Board
+                board={boardForDisplay}
+                legalMoves={isReviewingHistory ? [] : game.board.turn === myColor ? moves : []}
+                orientation={myColor}
+                onMove={handleLocalMove}
+                myColor={myColor}
+                lastMove={lastMoveForDisplay}
+                disabled={!!game.result || isReviewingHistory}
+                premoveMode={!isReviewingHistory && game.board.turn !== myColor && !game.result}
+                premoves={isReviewingHistory ? [] : premoves}
+                onCancelPremove={() => setPremoves([])}
+              />
+            </div>
+            {clockEnabledRef.current && (
+              <div
+                className="grid min-h-0 overflow-hidden gap-3 sm:h-[var(--board-height)] sm:w-52 sm:shrink-0 sm:grid-rows-[auto_minmax(0,1fr)_auto]"
+                style={railHeightStyle}
+              >
+                <ClockPill
+                  ms={myColor === "w" ? blackMs : whiteMs}
+                  active={!game.result && game.board.turn !== myColor}
+                />
+                <MoveList
+                  moves={game.board.history}
+                  currentPly={currentHistoryPly}
+                  onPlyChange={handleHistoryPlyChange}
+                  compact
+                />
+                <ClockPill
+                  ms={myColor === "w" ? whiteMs : blackMs}
+                  active={!game.result && game.board.turn === myColor}
+                />
+              </div>
+            )}
+          </div>
+          {!clockEnabledRef.current && (
+            <aside className="lg:col-start-2">
+            <MoveList
+              moves={game.board.history}
+              currentPly={currentHistoryPly}
+              onPlyChange={handleHistoryPlyChange}
             />
-          )}
-          <Board
-            board={game.board}
-            legalMoves={game.board.turn === myColor ? moves : []}
-            orientation={myColor}
-            onMove={handleLocalMove}
-            myColor={myColor}
-            lastMove={lastMove}
-            disabled={!!game.result}
-            premoveMode={game.board.turn !== myColor && !game.result}
-            premoves={premoves}
-            onCancelPremove={() => setPremoves([])}
-          />
-          {clockEnabledRef.current && (
-            <ClockPill
-              label="You"
-              ms={myColor === "w" ? whiteMs : blackMs}
-              active={!game.result && game.board.turn === myColor}
-            />
+          </aside>
           )}
         </div>
-        <aside className="space-y-4">
-          <DrawbackCard drawback={myDrawback} />
-          <DrawbackCard drawback={opponentDrawback} revealed={!!game.result} />
-          <MoveList moves={game.board.history} />
-        </aside>
       </div>
 
       {game.result && (
@@ -548,17 +616,16 @@ function SiteNav() {
   );
 }
 
-function ClockPill({ label, ms, active }: { label: string; ms: number; active: boolean }) {
+function ClockPill({ ms, active }: { ms: number; active: boolean }) {
   const low = ms < 30000;
   const critical = ms < 10000;
   return (
     <div
       className={
-        "plate p-3 flex items-center justify-between gap-3 transition " +
+        "plate p-3 flex items-center justify-center transition " +
         (active ? "border-gold/70 bg-gold/10 shadow-leaf" : "opacity-70")
       }
     >
-      <span className="smallcaps text-[10px] text-parchment-400">{label}</span>
       <span
         className={
           "font-mono text-xl tabular-nums font-semibold " +
