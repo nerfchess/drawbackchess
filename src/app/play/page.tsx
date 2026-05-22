@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { PLAYABLE_DRAWBACKS } from "@/engine/drawbacks/library";
+import { clearSavedAiGame } from "@/lib/gamePersistence";
 import { loadRating } from "@/lib/rating";
 
 const TIME_STEPS_SEC = [
@@ -40,6 +41,7 @@ export default function PlayPage() {
   }, []);
 
   const start = () => {
+    clearSavedAiGame();
     const params = new URLSearchParams({
       mode: "ai",
       difficulty,
