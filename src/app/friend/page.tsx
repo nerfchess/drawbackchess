@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 import { Board, QueuedPremove } from "@/components/Board";
+import { BoardPlayerRow } from "@/components/BoardPlayerRow";
 import { DrawbackCard } from "@/components/DrawbackCard";
 import { GameOver } from "@/components/GameOver";
 import { MoveList } from "@/components/MoveList";
@@ -202,7 +203,7 @@ export default function FriendPage() {
   useEffect(() => {
     if (!game || !clockEnabledRef.current) return;
     const shell = boardShellRef.current;
-    const boardEl = shell?.firstElementChild;
+    const boardEl = shell?.querySelector("[data-board-measure]");
     if (!boardEl) return;
     const syncHeight = () => setBoardHeight(boardEl.getBoundingClientRect().height);
     syncHeight();
@@ -486,18 +487,27 @@ export default function FriendPage() {
           </aside>
           <div className="flex flex-col sm:flex-row sm:items-stretch gap-3">
             <div ref={boardShellRef} className="min-w-0 flex-1">
-              <Board
-                board={boardForDisplay}
-                legalMoves={isReviewingHistory ? [] : game.board.turn === myColor ? moves : []}
-                orientation={myColor}
-                onMove={handleLocalMove}
-                myColor={myColor}
-                lastMove={lastMoveForDisplay}
-                disabled={!!game.result || isReviewingHistory}
-                premoveMode={!isReviewingHistory && game.board.turn !== myColor && !game.result}
-                premoves={isReviewingHistory ? [] : premoves}
-                onCancelPremove={() => setPremoves([])}
-              />
+              <div data-board-measure className="mx-auto w-full max-w-[min(92vw,720px)]">
+                <BoardPlayerRow
+                  board={boardForDisplay}
+                  playerColor={myColor === "w" ? "b" : "w"}
+                  myColor={myColor}
+                  name="Opponent"
+                />
+                <Board
+                  board={boardForDisplay}
+                  legalMoves={isReviewingHistory ? [] : game.board.turn === myColor ? moves : []}
+                  orientation={myColor}
+                  onMove={handleLocalMove}
+                  myColor={myColor}
+                  lastMove={lastMoveForDisplay}
+                  disabled={!!game.result || isReviewingHistory}
+                  premoveMode={!isReviewingHistory && game.board.turn !== myColor && !game.result}
+                  premoves={isReviewingHistory ? [] : premoves}
+                  onCancelPremove={() => setPremoves([])}
+                />
+                <BoardPlayerRow board={boardForDisplay} playerColor={myColor} myColor={myColor} name="You" />
+              </div>
             </div>
             {clockEnabledRef.current && (
               <div

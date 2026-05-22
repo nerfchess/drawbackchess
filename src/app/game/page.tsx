@@ -1,6 +1,7 @@
 "use client";
 
 import { Board } from "@/components/Board";
+import { BoardPlayerRow } from "@/components/BoardPlayerRow";
 import { DrawbackCard } from "@/components/DrawbackCard";
 import { GameOver } from "@/components/GameOver";
 import { MoveList } from "@/components/MoveList";
@@ -47,6 +48,12 @@ function pickRandomDrawback(): Drawback {
   const playable = PLAYABLE_DRAWBACKS.filter((d) => d.id !== "lucky");
   return playable[Math.floor(Math.random() * playable.length)];
 }
+
+const BOT_ELO: Record<AILevel, number> = {
+  easy: 1100,
+  medium: 1500,
+  hard: 1900,
+};
 
 // Pseudo-legal premove options on a (turn-flipped) board. The active drawback's
 // filterMoves is applied to the base move list so drawback-illegal premoves
@@ -146,6 +153,7 @@ function GamePage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [historyPly, setHistoryPly] = useState<number | null>(null);
   const [boardHeight, setBoardHeight] = useState<number | null>(null);
+  const [playerElo, setPlayerElo] = useState<number | null>(null);
   const aiThinking = useRef(false);
   const boardShellRef = useRef<HTMLDivElement | null>(null);
   const whiteCustomSpec = useRef<CustomDrawback | null>(null);
@@ -159,6 +167,7 @@ function GamePage() {
 
   useEffect(() => {
     setMutedState(isMuted());
+    setPlayerElo(loadRating().rating);
   }, []);
 
   useEffect(() => {
@@ -235,16 +244,16 @@ function GamePage() {
   const moves = useMemo(() => (game ? legalMoves(game) : []), [game]);
 
   useEffect(() => {
-    if (!game || !clockEnabled) return;
+    if (!game) return;
     const shell = boardShellRef.current;
-    const boardEl = shell?.firstElementChild;
+    const boardEl = shell?.querySelector("[data-board-measure]");
     if (!boardEl) return;
     const syncHeight = () => setBoardHeight(boardEl.getBoundingClientRect().height);
     syncHeight();
     const observer = new ResizeObserver(syncHeight);
     observer.observe(boardEl);
     return () => observer.disconnect();
-  }, [game, clockEnabled]);
+  }, [game]);
 
   // Build a "virtual" board that reflects the current actual board with every
   // queued premove applied in sequence. Pseudo-legal options for further
@@ -347,6 +356,7 @@ function GamePage() {
       game.result.winner === "draw" ? 0.5 : game.result.winner === myColor ? 1 : 0;
     const after = applyResult(before, difficulty, score);
     saveRating(after);
+    setPlayerElo(after.rating);
     setRatingChange({ before: before.rating, after: after.rating });
   }, [game?.result, myColor, difficulty]);
 
@@ -473,6 +483,9 @@ function GamePage() {
   const railHeightStyle = boardHeight
     ? ({ "--board-height": `${boardHeight}px` } as CSSProperties)
     : undefined;
+  const boardFitClass = hint
+    ? "max-w-[min(92vw,720px,calc(100dvh-17rem))]"
+    : "max-w-[min(92vw,720px,calc(100dvh-14rem))]";
 
   const handleMove = (m: Move) => {
     if (game.result || isReviewingHistory) return;
@@ -535,7 +548,6 @@ function GamePage() {
     setMutedState(next);
   };
 
-  const whoseTurn = game.board.turn === myColor ? "Yours" : "Theirs";
   const historyActions = confirmingResign ? (
     <div className="space-y-2">
       <div className="smallcaps text-[10px] text-parchment-300">Resign the game?</div>
@@ -578,8 +590,8 @@ function GamePage() {
   );
 
   return (
-    <main className="min-h-screen pb-12">
-      <nav className="px-4 sm:px-6 py-5 max-w-6xl mx-auto flex items-center justify-between">
+    <main className="flex h-dvh min-h-0 flex-col overflow-hidden">
+      <nav className="sticky top-0 z-20 mx-auto flex w-full max-w-6xl shrink-0 items-center justify-between px-4 py-2 sm:px-6">
         <Link href="/" className="font-display text-2xl tracking-tight">
           drawback<span className="text-gold-leaf">chess</span>
         </Link>
@@ -621,38 +633,29 @@ function GamePage() {
         </div>
       </nav>
 
-      <div className="max-w-[1500px] mx-auto px-3 sm:px-6 space-y-4">
-        <div className="flex items-center justify-between text-sm">
-            <span className="font-display text-parchment-200">
-              <span className="smallcaps text-[11px] text-parchment-400 mr-2">Turn</span>
-              <span className={game.board.turn === myColor ? "text-gold-leaf font-semibold" : "text-bruise-glow font-semibold"}>
-                {whoseTurn}
-              </span>
+      <div className="mx-auto flex w-full max-w-[1500px] flex-1 min-h-0 flex-col gap-2 overflow-hidden px-3 pb-6 sm:px-6">
+        {hint && (
+          <div
+            role="status"
+            aria-live="polite"
+            className={
+              "plate shrink-0 p-2 px-3 flex items-center gap-2 " +
+              (hint.tone === "warn"
+                ? "border-oxblood-glow/60 bg-oxblood/15"
+                : "border-gold/40 bg-gold/10")
+            }
+          >
+            <span aria-hidden="true" className="text-gold-leaf font-display font-bold text-lg leading-none">!</span>
+            <span className="font-display text-sm text-parchment">
+              {hint.text}
             </span>
           </div>
-        {/* Reserve a fixed slot for the hint so its appearance/disappearance
-            doesn't push the board down. The plate fades in when there's a hint. */}
-        <div className="min-h-[3.25rem]">
-          {hint && (
-            <div
-              role="status"
-              aria-live="polite"
-              className={
-                "plate p-3 px-4 flex items-center gap-3 " +
-                (hint.tone === "warn"
-                  ? "border-oxblood-glow/60 bg-oxblood/15"
-                  : "border-gold/40 bg-gold/10")
-              }
-            >
-              <span aria-hidden="true" className="text-gold-leaf font-display font-bold text-xl leading-none">!</span>
-              <span className="font-display text-[15px] text-parchment">
-                {hint.text}
-              </span>
-            </div>
-          )}
-        </div>
-        <div className="grid gap-y-4 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-x-6">
-          <aside className="grid gap-4 lg:grid-rows-[auto_1fr_auto] lg:self-stretch">
+        )}
+        <div
+          className="grid min-h-0 flex-1 gap-y-2 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-x-6"
+          style={railHeightStyle}
+        >
+          <aside className="hidden min-h-0 gap-3 overflow-hidden lg:grid lg:h-[var(--board-height)] lg:grid-rows-[auto_minmax(0,1fr)_auto] lg:self-start lg:py-[3.25rem]">
             <DrawbackCard drawback={opponentDrawback} revealed={!!game.result} />
             <div className="hidden lg:block" />
             <DrawbackCard
@@ -660,63 +663,72 @@ function GamePage() {
               progress={myDrawback.progress?.(myState, myCtx) ?? null}
             />
           </aside>
-          <div className="flex flex-col sm:flex-row sm:items-stretch gap-3">
-            <div ref={boardShellRef} className="min-w-0 flex-1">
-              <Board
-                board={boardForDisplay}
-                legalMoves={
-                  isReviewingHistory
-                    ? []
-                    : game.board.turn === myColor && !premovePending
-                    ? moves
-                    : premoveOptions
-                }
-                orientation={myColor}
-                onMove={handleMove}
-                myColor={myColor}
-                visual={isReviewingHistory ? undefined : { ...(visual ?? {}), highlightSquares: forcedSquares }}
-                lastMove={lastMoveForDisplay}
-                disabled={!!game.result || premovePending || isReviewingHistory}
-                premoveMode={!isReviewingHistory && premoveMode}
-                premoves={isReviewingHistory ? [] : validPremoves}
-                onCancelPremove={cancelPremove}
-              />
+          <div className="flex min-h-0 flex-col gap-3 sm:flex-row sm:items-stretch">
+            <div ref={boardShellRef} className="min-h-0 min-w-0 flex-1">
+              <div data-board-measure className={`mx-auto w-full ${boardFitClass}`}>
+                <BoardPlayerRow
+                  board={boardForDisplay}
+                  playerColor={myColor === "w" ? "b" : "w"}
+                  myColor={myColor}
+                  name={`${difficulty[0].toUpperCase()}${difficulty.slice(1)} Bot`}
+                  elo={BOT_ELO[difficulty]}
+                />
+                <Board
+                  board={boardForDisplay}
+                  legalMoves={
+                    isReviewingHistory
+                      ? []
+                      : game.board.turn === myColor && !premovePending
+                      ? moves
+                      : premoveOptions
+                  }
+                  orientation={myColor}
+                  onMove={handleMove}
+                  myColor={myColor}
+                  visual={isReviewingHistory ? undefined : { ...(visual ?? {}), highlightSquares: forcedSquares }}
+                  lastMove={lastMoveForDisplay}
+                  disabled={!!game.result || premovePending || isReviewingHistory}
+                  premoveMode={!isReviewingHistory && premoveMode}
+                  premoves={isReviewingHistory ? [] : validPremoves}
+                  onCancelPremove={cancelPremove}
+                />
+                <BoardPlayerRow
+                  board={boardForDisplay}
+                  playerColor={myColor}
+                  myColor={myColor}
+                  name="You"
+                  elo={playerElo}
+                />
+              </div>
             </div>
-            {clockEnabled && (
-              <div
-                className="grid min-h-0 overflow-hidden gap-3 sm:h-[var(--board-height)] sm:w-52 sm:shrink-0 sm:grid-rows-[auto_minmax(0,1fr)_auto]"
-                style={railHeightStyle}
-              >
+            <div
+              className={
+                "hidden min-h-0 overflow-hidden gap-3 sm:grid sm:h-[var(--board-height)] sm:w-52 sm:shrink-0 " +
+                (clockEnabled ? "sm:grid-rows-[auto_minmax(0,1fr)_auto]" : "sm:grid-rows-[minmax(0,1fr)]")
+              }
+              style={railHeightStyle}
+            >
+              {clockEnabled && (
                 <ClockPill
                   ms={myColor === "w" ? blackMs : whiteMs}
                   active={!game.result && game.board.turn !== myColor}
                 />
-                <MoveList
-                  moves={game.board.history}
-                  currentPly={currentHistoryPly}
-                  onPlyChange={handleHistoryPlyChange}
-                  compact
-                  footer={historyActions}
-                />
+              )}
+              <MoveList
+                moves={game.board.history}
+                currentPly={currentHistoryPly}
+                onPlyChange={handleHistoryPlyChange}
+                compact
+                showHeader={false}
+                footer={historyActions}
+              />
+              {clockEnabled && (
                 <ClockPill
                   ms={myColor === "w" ? whiteMs : blackMs}
                   active={!game.result && game.board.turn === myColor}
                 />
-              </div>
-            )}
-          </div>
-          {!clockEnabled && (
-            <aside className="lg:col-start-2">
-            <MoveList
-              moves={game.board.history}
-              currentPly={currentHistoryPly}
-              onPlyChange={handleHistoryPlyChange}
-              footer={historyActions}
-            />
-          </aside>
-          )}
-          <div className="space-y-4 lg:col-start-2">
-          <MaterialBar board={boardForDisplay} myColor={myColor} />
+              )}
+            </div>
           </div>
         </div>
       </div>
@@ -733,49 +745,6 @@ function GamePage() {
       )}
       <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </main>
-  );
-}
-
-function MaterialBar({ board, myColor }: { board: BoardState; myColor: Color }) {
-  const VAL: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
-  const START: Record<string, number> = { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 };
-  const counts: Record<Color, Record<string, number>> = {
-    w: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
-    b: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
-  };
-  for (const p of board.pieces) {
-    if (!p) continue;
-    counts[p.color][p.type]++;
-  }
-  const opp: Color = myColor === "w" ? "b" : "w";
-  let myAdv = 0;
-  for (const t of ["p", "n", "b", "r", "q"]) {
-    myAdv += (counts[myColor][t] - counts[opp][t]) * VAL[t];
-  }
-  const myCaptured: string[] = [];
-  const oppCaptured: string[] = [];
-  for (const t of ["q", "r", "b", "n", "p"]) {
-    const myLost = Math.max(0, START[t] - counts[myColor][t]);
-    const oppLost = Math.max(0, START[t] - counts[opp][t]);
-    const symMap: Record<string, string> = { p: "♟", n: "♞", b: "♝", r: "♜", q: "♛" };
-    for (let i = 0; i < oppLost; i++) myCaptured.push(symMap[t]);
-    for (let i = 0; i < myLost; i++) oppCaptured.push(symMap[t]);
-  }
-  const label = myAdv === 0 ? "even" : myAdv > 0 ? `+${myAdv}` : `${myAdv}`;
-  return (
-    <div className="plate p-2 px-3 flex items-center justify-between text-sm">
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="smallcaps text-[10px] text-parchment-400">You</span>
-        <span className="text-parchment-200 truncate font-mono text-base leading-none">{myCaptured.join("")}</span>
-      </div>
-      <span className={"font-mono font-semibold text-base " + (myAdv > 0 ? "text-gold-leaf" : myAdv < 0 ? "text-oxblood-glow" : "text-parchment-400")}>
-        {label}
-      </span>
-      <div className="flex items-center gap-2 min-w-0 justify-end">
-        <span className="text-parchment-200 truncate font-mono text-base leading-none">{oppCaptured.join("")}</span>
-        <span className="smallcaps text-[10px] text-parchment-400">Opp</span>
-      </div>
-    </div>
   );
 }
 

@@ -321,8 +321,6 @@ export function Board({
 
   return (
     <div ref={boardRef} className="relative w-full max-w-[min(92vw,720px)] aspect-square mx-auto">
-      {/* Outer frame: aged gilt border + plate */}
-      <div className="absolute inset-0 plate gilt rounded-md" />
       <div className="absolute inset-2 sm:inset-3 rounded-sm overflow-hidden border border-black/40">
         <div
           data-board-grid

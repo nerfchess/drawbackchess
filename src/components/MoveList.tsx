@@ -10,12 +10,14 @@ export function MoveList({
   currentPly = moves.length,
   onPlyChange,
   compact = false,
+  showHeader = true,
   footer,
 }: {
   moves: Move[];
   currentPly?: number;
   onPlyChange?: (ply: number) => void;
   compact?: boolean;
+  showHeader?: boolean;
   footer?: ReactNode;
 }) {
   const rows: { w: string; b: string }[] = [];
@@ -62,12 +64,14 @@ export function MoveList({
 
   return (
     <div className={rootClass + (compact ? " overflow-hidden" : "")}>
-      <div className="flex shrink-0 items-center justify-between gap-2 mb-2">
-        <div className={titleClass}>{compact ? "History" : "Move history"}</div>
-        <div className="font-mono text-[11px] text-parchment-400 tabular-nums">
-          {currentPly}/{moves.length}
+      {showHeader && (
+        <div className="flex shrink-0 items-center justify-between gap-2 mb-2">
+          <div className={titleClass}>{compact ? "History" : "Move history"}</div>
+          <div className="font-mono text-[11px] text-parchment-400 tabular-nums">
+            {currentPly}/{moves.length}
+          </div>
         </div>
-      </div>
+      )}
       <div className="grid shrink-0 grid-cols-4 gap-1 mb-2">
         <HistoryButton label="To start" disabled={!canBack} onClick={() => jumpTo(0)}>
           <ChevronsLeft size={15} />
