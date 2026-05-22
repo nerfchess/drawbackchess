@@ -162,23 +162,27 @@ function GamePage() {
   }, []);
 
   useEffect(() => {
-    const saved = loadSavedAiGame(querySignature);
-    if (saved) {
-      const restored = restoreSavedAiGame(saved);
-      if (restored) {
-        setMyColor(saved.myColor);
-        setGame(restored);
-        setWhiteMs(saved.whiteMs);
-        setBlackMs(saved.blackMs);
-        setPremoves(saved.premoves ?? []);
-        whiteCustomSpec.current =
-          saved.game.white.drawback.kind === "custom" ? saved.game.white.drawback.spec : null;
-        blackCustomSpec.current =
-          saved.game.black.drawback.kind === "custom" ? saved.game.black.drawback.spec : null;
-        lastSeenMoveCount.current = restored.board.history.length;
-        sawResult.current = !!restored.result;
-        return;
+    try {
+      const saved = loadSavedAiGame(querySignature);
+      if (saved) {
+        const restored = restoreSavedAiGame(saved);
+        if (restored) {
+          setMyColor(saved.myColor);
+          setGame(restored);
+          setWhiteMs(saved.whiteMs);
+          setBlackMs(saved.blackMs);
+          setPremoves(saved.premoves ?? []);
+          whiteCustomSpec.current =
+            saved.game.white.drawback.kind === "custom" ? saved.game.white.drawback.spec : null;
+          blackCustomSpec.current =
+            saved.game.black.drawback.kind === "custom" ? saved.game.black.drawback.spec : null;
+          lastSeenMoveCount.current = restored.board.history.length;
+          sawResult.current = !!restored.result;
+          return;
+        }
       }
+    } catch {
+      // Ignore incompatible saved games and deal a fresh one below.
     }
 
     let myDb: Drawback;
@@ -256,7 +260,7 @@ function GamePage() {
   const myStateForPremove = game ? (myColor === "w" ? game.white.state : game.black.state) : null;
 
   const { virtualBoard, validPremoves } = useMemo(() => {
-    if (!game || game.result || game.board.turn === myColor) {
+    if (!game || game.result || (game.board.turn === myColor && premoves.length === 0)) {
       return { virtualBoard: null as BoardState | null, validPremoves: [] as QueuedPremove[] };
     }
     let board = cloneBoard(game.board);
@@ -532,6 +536,46 @@ function GamePage() {
   };
 
   const whoseTurn = game.board.turn === myColor ? "Yours" : "Theirs";
+  const historyActions = confirmingResign ? (
+    <div className="space-y-2">
+      <div className="smallcaps text-[10px] text-parchment-300">Resign the game?</div>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => { onResign(); setConfirmingResign(false); }}
+          className="min-w-0 px-3 py-2 border border-oxblood/70 bg-oxblood/25 text-oxblood-glow hover:bg-oxblood/40 transition text-xs font-display font-semibold tracking-wide"
+        >
+          Yes
+        </button>
+        <button
+          onClick={() => setConfirmingResign(false)}
+          className="min-w-0 px-3 py-2 btn-ghost text-xs font-display tracking-wide"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  ) : (
+    <div className="space-y-2">
+      {drawOfferStatus === "declined" && (
+        <div className="smallcaps text-[10px] text-parchment-300">Draw declined.</div>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={onOfferDraw}
+          disabled={drawOfferStatus !== "idle"}
+          className="min-w-0 px-3 py-2 border border-gold/40 bg-gold/10 text-gold-leaf hover:bg-gold/20 hover:border-gold/70 transition text-xs font-display font-semibold tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {drawOfferStatus === "offering" ? "Offering..." : "Offer Draw"}
+        </button>
+        <button
+          onClick={() => setConfirmingResign(true)}
+          className="min-w-0 px-3 py-2 border border-oxblood/40 bg-oxblood/10 text-oxblood-glow hover:bg-oxblood/20 hover:border-oxblood/70 transition text-xs font-display font-semibold tracking-wide"
+        >
+          Resign
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <main className="min-h-screen pb-12">
@@ -585,42 +629,6 @@ function GamePage() {
                 {whoseTurn}
               </span>
             </span>
-            {confirmingResign ? (
-              <div className="flex items-center gap-2">
-                <span className="smallcaps text-[10px] text-parchment-300">Resign the game?</span>
-                <button
-                  onClick={() => { onResign(); setConfirmingResign(false); }}
-                  className="px-3 py-1.5 rounded-full border border-oxblood/70 bg-oxblood/25 text-oxblood-glow hover:bg-oxblood/40 transition text-xs font-display font-semibold tracking-wide"
-                >
-                  Yes, resign
-                </button>
-                <button
-                  onClick={() => setConfirmingResign(false)}
-                  className="px-3 py-1.5 rounded-full btn-ghost text-xs font-display tracking-wide"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                {drawOfferStatus === "declined" && (
-                  <span className="smallcaps text-[10px] text-parchment-300">Draw declined.</span>
-                )}
-                <button
-                  onClick={onOfferDraw}
-                  disabled={drawOfferStatus !== "idle"}
-                  className="px-4 py-1.5 rounded-full border border-gold/40 bg-gold/10 text-gold-leaf hover:bg-gold/20 hover:border-gold/70 transition text-xs font-display font-semibold tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {drawOfferStatus === "offering" ? "Offering…" : "Offer Draw"}
-                </button>
-                <button
-                  onClick={() => setConfirmingResign(true)}
-                  className="px-4 py-1.5 rounded-full border border-oxblood/40 bg-oxblood/10 text-oxblood-glow hover:bg-oxblood/20 hover:border-oxblood/70 transition text-xs font-display font-semibold tracking-wide"
-                >
-                  Resign
-                </button>
-              </div>
-            )}
           </div>
         {/* Reserve a fixed slot for the hint so its appearance/disappearance
             doesn't push the board down. The plate fades in when there's a hint. */}
@@ -688,6 +696,7 @@ function GamePage() {
                   currentPly={currentHistoryPly}
                   onPlyChange={handleHistoryPlyChange}
                   compact
+                  footer={historyActions}
                 />
                 <ClockPill
                   ms={myColor === "w" ? whiteMs : blackMs}
@@ -702,6 +711,7 @@ function GamePage() {
               moves={game.board.history}
               currentPly={currentHistoryPly}
               onPlyChange={handleHistoryPlyChange}
+              footer={historyActions}
             />
           </aside>
           )}

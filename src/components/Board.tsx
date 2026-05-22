@@ -51,6 +51,8 @@ interface DragState {
   cell: number; // pixel size of one square
 }
 
+type RightClickMark = 1 | 2 | 3 | 4;
+
 export function Board({
   board,
   legalMoves,
@@ -76,6 +78,7 @@ export function Board({
   const [promotionMove, setPromotionMove] = useState<Move[] | null>(null);
   const [drag, setDrag] = useState<DragState | null>(null);
   const [hoverSq, setHoverSq] = useState<Square | null>(null);
+  const [rightClickMarks, setRightClickMarks] = useState<Record<number, RightClickMark>>({});
   const boardRef = useRef<HTMLDivElement>(null);
   const ghostRef = useRef<HTMLDivElement>(null);
   const gridRectRef = useRef<DOMRect | null>(null);
@@ -273,13 +276,47 @@ export function Board({
 
   const draggedPiece = drag ? board.pieces[drag.from] : null;
 
-  const handleContextMenu = (e: React.MouseEvent) => {
+  useEffect(() => {
+    setRightClickMarks((marks) => {
+      let changed = false;
+      const next: Record<number, RightClickMark> = {};
+      for (const [rawSq, mark] of Object.entries(marks)) {
+        const sq = Number(rawSq) as Square;
+        if (board.pieces[sq]) {
+          next[sq] = mark;
+        } else {
+          changed = true;
+        }
+      }
+      return changed ? next : marks;
+    });
+  }, [board.pieces]);
+
+  const markFromModifiers = (e: React.MouseEvent): RightClickMark => {
+    if (e.altKey) return 2;
+    if (e.ctrlKey) return 3;
+    if (e.shiftKey) return 4;
+    return 1;
+  };
+
+  const handleSquareContextMenu = (e: React.MouseEvent, sq: Square) => {
+    e.preventDefault();
     // right-click cancels the whole premove queue (chess.com convention)
     if (premoves && premoves.length > 0 && onCancelPremove) {
-      e.preventDefault();
       onCancelPremove();
       setSelected(null);
     }
+    if (!board.pieces[sq]) return;
+    const mark = markFromModifiers(e);
+    setRightClickMarks((marks) => {
+      const next = { ...marks };
+      if (next[sq] === mark) {
+        delete next[sq];
+      } else {
+        next[sq] = mark;
+      }
+      return next;
+    });
   };
 
   return (
@@ -290,7 +327,7 @@ export function Board({
         <div
           data-board-grid
           className="grid grid-cols-8 grid-rows-8 w-full h-full select-none"
-          onContextMenu={handleContextMenu}
+          onContextMenu={(e) => e.preventDefault()}
         >
           {orderedSquares.map((sq) => {
             const f = FILE(sq), r = RANK(sq);
@@ -310,6 +347,7 @@ export function Board({
             const isDragging = drag?.from === sq;
             const isForced = visual?.highlightSquares?.includes(sq);
             const isPremoveSquare = premoveSquares.has(sq);
+            const rightClickMark = rightClickMarks[sq];
 
             const fogHide =
               !!visual?.fogged && piece && piece.color !== myColor && !lastTo;
@@ -326,6 +364,7 @@ export function Board({
               <div
                 key={sq}
                 onClick={() => handleSquareClick(sq)}
+                onContextMenu={(e) => handleSquareContextMenu(e, sq)}
                 onPointerDown={(e) => piece && onPointerDownPiece(e, sq)}
                 className={classes}
                 style={{ cursor: piece && piece.color === myColor && !disabled ? "grab" : "default" }}
@@ -340,6 +379,9 @@ export function Board({
                 )}
                 {banned && (
                   <div className="absolute inset-0 bg-red-900/45 pointer-events-none" />
+                )}
+                {rightClickMark && (
+                  <div className={`absolute inset-0 pointer-events-none sq-rmb-mark sq-rmb-mark-${rightClickMark}`} />
                 )}
                 {isDuck && (
                   <div className="absolute inset-0 flex items-center justify-center text-3xl pointer-events-none">🦆</div>

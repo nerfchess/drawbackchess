@@ -3,18 +3,20 @@
 import { moveToSAN } from "@/engine/board";
 import { Move } from "@/engine/types";
 import { ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight } from "lucide-react";
-import { type MutableRefObject, useEffect, useRef } from "react";
+import { type MutableRefObject, type ReactNode, useEffect, useRef } from "react";
 
 export function MoveList({
   moves,
   currentPly = moves.length,
   onPlyChange,
   compact = false,
+  footer,
 }: {
   moves: Move[];
   currentPly?: number;
   onPlyChange?: (ply: number) => void;
   compact?: boolean;
+  footer?: ReactNode;
 }) {
   const rows: { w: string; b: string }[] = [];
   for (let i = 0; i < moves.length; i += 2) {
@@ -117,6 +119,7 @@ export function MoveList({
           </div>
         ))}
       </div>
+      {footer && <div className="shrink-0 mt-3 pt-3 border-t border-parchment-300/10">{footer}</div>}
     </div>
   );
 }
