@@ -556,34 +556,36 @@ function GamePage() {
               </div>
             )}
           </div>
-          {clockEnabled && (
-            <ClockPill
-              label="Opponent"
-              ms={myColor === "w" ? blackMs : whiteMs}
-              active={!game.result && game.board.turn !== myColor}
+          <div className="grid sm:grid-cols-[minmax(0,1fr)_8.5rem] gap-3 sm:gap-4 items-stretch">
+            <Board
+              board={virtualBoard ?? game.board}
+              legalMoves={game.board.turn === myColor && !premovePending ? moves : premoveOptions}
+              orientation={myColor}
+              onMove={handleMove}
+              myColor={myColor}
+              visual={{ ...(visual ?? {}), highlightSquares: forcedSquares }}
+              lastMove={lastMove}
+              disabled={!!game.result || premovePending}
+              premoveMode={premoveMode}
+              premoves={validPremoves}
+              onCancelPremove={cancelPremove}
             />
-          )}
-          <Board
-            board={virtualBoard ?? game.board}
-            legalMoves={game.board.turn === myColor && !premovePending ? moves : premoveOptions}
-            orientation={myColor}
-            onMove={handleMove}
-            myColor={myColor}
-            visual={{ ...(visual ?? {}), highlightSquares: forcedSquares }}
-            lastMove={lastMove}
-            disabled={!!game.result || premovePending}
-            premoveMode={premoveMode}
-            premoves={validPremoves}
-            onCancelPremove={cancelPremove}
-          />
-          <MaterialBar board={virtualBoard ?? game.board} myColor={myColor} />
-          {clockEnabled && (
-            <ClockPill
-              label="You"
-              ms={myColor === "w" ? whiteMs : blackMs}
-              active={!game.result && game.board.turn === myColor}
-            />
-          )}
+            {clockEnabled && (
+              <div className="grid grid-cols-2 sm:grid-cols-1 sm:grid-rows-[auto_1fr_auto] gap-3 sm:h-full">
+                <ClockPill
+                  label="Opponent"
+                  ms={myColor === "w" ? blackMs : whiteMs}
+                  active={!game.result && game.board.turn !== myColor}
+                />
+                <div className="hidden sm:block" />
+                <ClockPill
+                  label="You"
+                  ms={myColor === "w" ? whiteMs : blackMs}
+                  active={!game.result && game.board.turn === myColor}
+                />
+              </div>
+            )}
+          </div>
         </div>
         <aside className="space-y-4">
           <DrawbackCard
@@ -653,22 +655,21 @@ function MaterialBar({ board, myColor }: { board: BoardState; myColor: Color }) 
   );
 }
 
-function ClockPill({ label, ms, active }: { label: string; ms: number; active: boolean }) {
+function ClockPill({ ms, active }: { label: string; ms: number; active: boolean }) {
   const low = ms < 30000;
   const critical = ms < 10000;
   return (
     <div
       className={
-        "plate p-3 flex items-center justify-between gap-3 transition " +
+        "plate px-3 py-1 flex items-center justify-center transition " +
         (active
           ? "border-gold/70 bg-gold/10 shadow-leaf"
           : "opacity-70")
       }
     >
-      <span className="smallcaps text-[10px] text-parchment-400">{label}</span>
       <span
         className={
-          "font-mono text-xl tabular-nums font-semibold " +
+          "font-mono text-xl sm:text-2xl tabular-nums font-semibold " +
           (critical
             ? "text-oxblood-glow"
             : low

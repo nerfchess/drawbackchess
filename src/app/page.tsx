@@ -2,13 +2,17 @@
 
 import Link from "next/link";
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { DrawbackCard } from "@/components/DrawbackCard";
+import { SettingsPanel } from "@/components/SettingsPanel";
 import { COWARDLY, FOG_OF_WAR, PACMAN, RISING_WATER } from "@/engine/drawbacks/implemented";
 
 export default function HomePage() {
+  const [settingsOpen, setSettingsOpen] = useState(false);
+
   return (
     <main className="min-h-screen">
-      <SiteNav />
+      <SiteNav onOpenSettings={() => setSettingsOpen(true)} />
 
       <section className="max-w-6xl mx-auto px-6 pt-10 pb-16 sm:pt-16 sm:pb-24 grid lg:grid-cols-[1.1fr_1fr] gap-14 items-center">
         <div className="animate-rise">
@@ -97,29 +101,65 @@ export default function HomePage() {
       </section>
 
       <SiteFooter />
+      <SettingsPanel open={settingsOpen} onClose={() => setSettingsOpen(false)} />
     </main>
   );
 }
 
-function SiteNav() {
+function SiteNav({ onOpenSettings }: { onOpenSettings: () => void }) {
   return (
     <nav className="px-6 py-6 flex items-center justify-between max-w-6xl mx-auto">
       <Link href="/" className="font-display text-2xl tracking-tight">
         drawback<span className="text-gold-leaf">chess</span>
       </Link>
-      <div className="flex gap-1 sm:gap-2 text-sm font-display">
+      <div className="flex items-center gap-1 sm:gap-2 text-sm font-display">
         <Link href="/play" className="px-3 py-1.5 rounded-full hover:bg-white/5 text-parchment">Play</Link>
         <Link href="/codex" className="px-3 py-1.5 rounded-full hover:bg-white/5 text-parchment">Rules</Link>
         <Link href="/tutorial" className="px-3 py-1.5 rounded-full hover:bg-white/5 text-parchment">How to play</Link>
+        <button
+          type="button"
+          onClick={onOpenSettings}
+          aria-label="Settings"
+          title="Settings"
+          className="ml-1 w-9 h-9 inline-flex items-center justify-center rounded-full btn-ghost"
+        >
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+            <circle cx="12" cy="12" r="3" />
+            <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33 1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82 1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" />
+          </svg>
+        </button>
       </div>
     </nav>
   );
 }
 
 function SiteFooter() {
+  const footerLinks = [
+    { href: "/contact", label: "Contact" },
+    { href: "/privacy-policy", label: "Privacy policy" },
+    { href: "/about", label: "About" },
+    { href: "/faq", label: "FAQ" },
+  ];
+
   return (
     <footer className="max-w-6xl mx-auto px-6 py-10">
-      <div className="flex flex-col sm:flex-row items-center justify-between gap-2 text-xs text-parchment-400">
+      <nav
+        aria-label="Footer"
+        className="flex flex-wrap items-center justify-center sm:justify-end gap-y-2 text-xs text-parchment-400"
+      >
+        {footerLinks.map((link, index) => (
+          <span key={link.href} className="flex items-center">
+            {index > 0 && <span aria-hidden="true" className="mx-3 opacity-50">|</span>}
+            <Link
+              href={link.href}
+              className="transition-colors hover:text-parchment"
+            >
+              {link.label}
+            </Link>
+          </span>
+        ))}
+      </nav>
+      <div className="mt-3 flex flex-col sm:flex-row items-center justify-between gap-4 text-xs text-parchment-400">
         <span>A reimagining of Drawback Chess. Not affiliated with the original.</span>
         <span className="font-mono text-[10px] opacity-70">made with ♥</span>
       </div>
