@@ -1,6 +1,7 @@
 "use client";
 
 import { Board } from "@/components/Board";
+import { BoardPlayerRow } from "@/components/BoardPlayerRow";
 import { DrawbackCard } from "@/components/DrawbackCard";
 import { GameOver } from "@/components/GameOver";
 import { MoveList } from "@/components/MoveList";
@@ -25,9 +26,11 @@ import { buildCustomDrawback, CustomDrawback } from "@/engine/drawbacks/custom";
 import { isMuted, playCapture, playCheck, playDrawback, playMove as playMoveSfx, setMuted } from "@/lib/sounds";
 import { applyResult, loadRating, saveRating } from "@/lib/rating";
 import { SettingsPanel } from "@/components/SettingsPanel";
+import { loadSavedAiGame, restoreSavedAiGame, saveAiGame } from "@/lib/gamePersistence";
+import { boardAtPly } from "@/lib/gameReview";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Suspense, useEffect, useMemo, useRef, useState } from "react";
+import { Suspense, type CSSProperties, useEffect, useMemo, useRef, useState } from "react";
 
 function formatClock(ms: number): string {
   const clamped = Math.max(0, ms);
@@ -45,6 +48,12 @@ function pickRandomDrawback(): Drawback {
   const playable = PLAYABLE_DRAWBACKS.filter((d) => d.id !== "lucky");
   return playable[Math.floor(Math.random() * playable.length)];
 }
+
+const BOT_ELO: Record<AILevel, number> = {
+  easy: 1100,
+  medium: 1500,
+  hard: 1900,
+};
 
 // Pseudo-legal premove options on a (turn-flipped) board. The active drawback's
 // filterMoves is applied to the base move list so drawback-illegal premoves
@@ -112,6 +121,7 @@ function LoadingPanel() {
 function GamePage() {
   const router = useRouter();
   const params = useSearchParams();
+  const querySignature = params.toString();
   const difficulty = (params.get("difficulty") ?? "medium") as AILevel;
   const myColorParam = params.get("color") ?? "random";
   const myDrawbackId = params.get("drawback") ?? "random";
@@ -126,11 +136,11 @@ function GamePage() {
   }, [params]);
   const clockEnabled = initialTimeMs > 0;
 
-  const myColor: Color = useMemo(() => {
+  const [myColor, setMyColor] = useState<Color>(() => {
     if (myColorParam === "w") return "w";
     if (myColorParam === "b") return "b";
     return Math.random() < 0.5 ? "w" : "b";
-  }, [myColorParam]);
+  });
 
   const [game, setGame] = useState<DrawbackGame | null>(null);
   const [, force] = useState(0);
@@ -141,7 +151,13 @@ function GamePage() {
   const [whiteMs, setWhiteMs] = useState(initialTimeMs);
   const [blackMs, setBlackMs] = useState(initialTimeMs);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [historyPly, setHistoryPly] = useState<number | null>(null);
+  const [boardHeight, setBoardHeight] = useState<number | null>(null);
+  const [playerElo, setPlayerElo] = useState<number | null>(null);
   const aiThinking = useRef(false);
+  const boardShellRef = useRef<HTMLDivElement | null>(null);
+  const whiteCustomSpec = useRef<CustomDrawback | null>(null);
+  const blackCustomSpec = useRef<CustomDrawback | null>(null);
 
   const addIncrement = (color: Color) => {
     if (!clockEnabled || incrementMs <= 0) return;
@@ -151,14 +167,40 @@ function GamePage() {
 
   useEffect(() => {
     setMutedState(isMuted());
+    setPlayerElo(loadRating().rating);
   }, []);
 
   useEffect(() => {
+    try {
+      const saved = loadSavedAiGame(querySignature);
+      if (saved) {
+        const restored = restoreSavedAiGame(saved);
+        if (restored) {
+          setMyColor(saved.myColor);
+          setGame(restored);
+          setWhiteMs(saved.whiteMs);
+          setBlackMs(saved.blackMs);
+          setPremoves(saved.premoves ?? []);
+          whiteCustomSpec.current =
+            saved.game.white.drawback.kind === "custom" ? saved.game.white.drawback.spec : null;
+          blackCustomSpec.current =
+            saved.game.black.drawback.kind === "custom" ? saved.game.black.drawback.spec : null;
+          lastSeenMoveCount.current = restored.board.history.length;
+          sawResult.current = !!restored.result;
+          return;
+        }
+      }
+    } catch {
+      // Ignore incompatible saved games and deal a fresh one below.
+    }
+
     let myDb: Drawback;
+    let myCustomSpec: CustomDrawback | null = null;
     if (myDrawbackId === "__custom__") {
       try {
         const raw = sessionStorage.getItem("dc:active-custom");
         const spec = raw ? (JSON.parse(raw) as CustomDrawback) : null;
+        myCustomSpec = spec;
         myDb = spec ? buildCustomDrawback(spec) : pickRandomDrawback();
       } catch {
         myDb = pickRandomDrawback();
@@ -171,11 +213,47 @@ function GamePage() {
     const aiDb = pickRandomDrawback();
     const wDb = myColor === "w" ? myDb : aiDb;
     const bDb = myColor === "w" ? aiDb : myDb;
+    whiteCustomSpec.current = myColor === "w" ? myCustomSpec : null;
+    blackCustomSpec.current = myColor === "w" ? null : myCustomSpec;
+    setHistoryPly(null);
     setGame(newGame(wDb, bDb, makeSeed()));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  useEffect(() => {
+    if (!game) return;
+    saveAiGame({
+      query: querySignature,
+      myColor,
+      game,
+      whiteMs,
+      blackMs,
+      premoves,
+      whiteCustomSpec: whiteCustomSpec.current,
+      blackCustomSpec: blackCustomSpec.current,
+    });
+  }, [game, querySignature, myColor, whiteMs, blackMs, premoves]);
+
+  useEffect(() => {
+    if (!game || historyPly == null) return;
+    if (historyPly > game.board.history.length) {
+      setHistoryPly(game.board.history.length);
+    }
+  }, [game, historyPly]);
+
   const moves = useMemo(() => (game ? legalMoves(game) : []), [game]);
+
+  useEffect(() => {
+    if (!game) return;
+    const shell = boardShellRef.current;
+    const boardEl = shell?.querySelector("[data-board-measure]");
+    if (!boardEl) return;
+    const syncHeight = () => setBoardHeight(boardEl.getBoundingClientRect().height);
+    syncHeight();
+    const observer = new ResizeObserver(syncHeight);
+    observer.observe(boardEl);
+    return () => observer.disconnect();
+  }, [game]);
 
   // Build a "virtual" board that reflects the current actual board with every
   // queued premove applied in sequence. Pseudo-legal options for further
@@ -191,7 +269,7 @@ function GamePage() {
   const myStateForPremove = game ? (myColor === "w" ? game.white.state : game.black.state) : null;
 
   const { virtualBoard, validPremoves } = useMemo(() => {
-    if (!game || game.result || game.board.turn === myColor) {
+    if (!game || game.result || (game.board.turn === myColor && premoves.length === 0)) {
       return { virtualBoard: null as BoardState | null, validPremoves: [] as QueuedPremove[] };
     }
     let board = cloneBoard(game.board);
@@ -278,6 +356,7 @@ function GamePage() {
       game.result.winner === "draw" ? 0.5 : game.result.winner === myColor ? 1 : 0;
     const after = applyResult(before, difficulty, score);
     saveRating(after);
+    setPlayerElo(after.rating);
     setRatingChange({ before: before.rating, after: after.rating });
   }, [game?.result, myColor, difficulty]);
 
@@ -369,6 +448,22 @@ function GamePage() {
     };
   }, [game, myColor, difficulty, clockEnabled, incrementMs]);
 
+  const reviewBoard = useMemo(() => {
+    if (!game || historyPly == null) return null;
+    return boardAtPly(game.board.history, historyPly);
+  }, [game, historyPly]);
+  const currentHistoryPly = historyPly ?? game?.board.history.length ?? 0;
+  const isReviewingHistory = historyPly != null;
+  const handleHistoryPlyChange = (ply: number) => {
+    const max = game?.board.history.length ?? 0;
+    if (ply >= max) {
+      setHistoryPly(null);
+    } else {
+      setHistoryPly(Math.max(0, ply));
+      setPremoves([]);
+    }
+  };
+
   if (!game) {
     return <LoadingPanel />;
   }
@@ -379,11 +474,21 @@ function GamePage() {
   const visual = myDrawback.visual?.(myState, myCtx);
   const opponentDrawback = myColor === "w" ? game.black.drawback : game.white.drawback;
   const lastMove = game.board.history[game.board.history.length - 1] ?? null;
+  const boardForDisplay = reviewBoard ?? virtualBoard ?? game.board;
+  const lastMoveForDisplay = isReviewingHistory
+    ? game.board.history[currentHistoryPly - 1] ?? null
+    : lastMove;
   const hint = currentHint(game, myColor);
   const forcedSquares = hint?.squares ?? [];
+  const railHeightStyle = boardHeight
+    ? ({ "--board-height": `${boardHeight}px` } as CSSProperties)
+    : undefined;
+  const boardFitClass = hint
+    ? "max-w-[min(92vw,720px,calc(100dvh-17rem))]"
+    : "max-w-[min(92vw,720px,calc(100dvh-14rem))]";
 
   const handleMove = (m: Move) => {
-    if (game.result) return;
+    if (game.result || isReviewingHistory) return;
     if (game.board.turn !== myColor) {
       // append to the premove queue; chained premoves are evaluated against
       // the virtual board derived from any prior queued moves
@@ -443,11 +548,50 @@ function GamePage() {
     setMutedState(next);
   };
 
-  const whoseTurn = game.board.turn === myColor ? "Yours" : "Theirs";
+  const historyActions = confirmingResign ? (
+    <div className="space-y-2">
+      <div className="smallcaps text-[10px] text-parchment-300">Resign the game?</div>
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={() => { onResign(); setConfirmingResign(false); }}
+          className="min-w-0 px-3 py-2 border border-oxblood/70 bg-oxblood/25 text-oxblood-glow hover:bg-oxblood/40 transition text-xs font-display font-semibold tracking-wide"
+        >
+          Yes
+        </button>
+        <button
+          onClick={() => setConfirmingResign(false)}
+          className="min-w-0 px-3 py-2 btn-ghost text-xs font-display tracking-wide"
+        >
+          Cancel
+        </button>
+      </div>
+    </div>
+  ) : (
+    <div className="space-y-2">
+      {drawOfferStatus === "declined" && (
+        <div className="smallcaps text-[10px] text-parchment-300">Draw declined.</div>
+      )}
+      <div className="grid grid-cols-2 gap-2">
+        <button
+          onClick={onOfferDraw}
+          disabled={drawOfferStatus !== "idle"}
+          className="min-w-0 px-3 py-2 border border-gold/40 bg-gold/10 text-gold-leaf hover:bg-gold/20 hover:border-gold/70 transition text-xs font-display font-semibold tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {drawOfferStatus === "offering" ? "Offering..." : "Offer Draw"}
+        </button>
+        <button
+          onClick={() => setConfirmingResign(true)}
+          className="min-w-0 px-3 py-2 border border-oxblood/40 bg-oxblood/10 text-oxblood-glow hover:bg-oxblood/20 hover:border-oxblood/70 transition text-xs font-display font-semibold tracking-wide"
+        >
+          Resign
+        </button>
+      </div>
+    </div>
+  );
 
   return (
-    <main className="min-h-screen pb-12">
-      <nav className="px-4 sm:px-6 py-5 max-w-6xl mx-auto flex items-center justify-between">
+    <main className="flex h-dvh min-h-0 flex-col overflow-hidden">
+      <nav className="sticky top-0 z-20 mx-auto flex w-full max-w-6xl shrink-0 items-center justify-between px-4 py-2 sm:px-6">
         <Link href="/" className="font-display text-2xl tracking-tight">
           drawback<span className="text-gold-leaf">chess</span>
         </Link>
@@ -489,112 +633,104 @@ function GamePage() {
         </div>
       </nav>
 
-      <div className="max-w-6xl mx-auto px-3 sm:px-6 grid lg:grid-cols-[1fr_340px] gap-6">
-        <div className="space-y-4">
-          <div className="flex items-center justify-between text-sm">
-            <span className="font-display text-parchment-200">
-              <span className="smallcaps text-[11px] text-parchment-400 mr-2">Turn</span>
-              <span className={game.board.turn === myColor ? "text-gold-leaf font-semibold" : "text-bruise-glow font-semibold"}>
-                {whoseTurn}
-              </span>
+      <div className="mx-auto flex w-full max-w-[1500px] flex-1 min-h-0 flex-col gap-2 overflow-hidden px-3 pb-6 sm:px-6">
+        {hint && (
+          <div
+            role="status"
+            aria-live="polite"
+            className={
+              "plate shrink-0 p-2 px-3 flex items-center gap-2 " +
+              (hint.tone === "warn"
+                ? "border-oxblood-glow/60 bg-oxblood/15"
+                : "border-gold/40 bg-gold/10")
+            }
+          >
+            <span aria-hidden="true" className="text-gold-leaf font-display font-bold text-lg leading-none">!</span>
+            <span className="font-display text-sm text-parchment">
+              {hint.text}
             </span>
-            {confirmingResign ? (
-              <div className="flex items-center gap-2">
-                <span className="smallcaps text-[10px] text-parchment-300">Resign the game?</span>
-                <button
-                  onClick={() => { onResign(); setConfirmingResign(false); }}
-                  className="px-3 py-1.5 rounded-full border border-oxblood/70 bg-oxblood/25 text-oxblood-glow hover:bg-oxblood/40 transition text-xs font-display font-semibold tracking-wide"
-                >
-                  Yes, resign
-                </button>
-                <button
-                  onClick={() => setConfirmingResign(false)}
-                  className="px-3 py-1.5 rounded-full btn-ghost text-xs font-display tracking-wide"
-                >
-                  Cancel
-                </button>
-              </div>
-            ) : (
-              <div className="flex items-center gap-2">
-                {drawOfferStatus === "declined" && (
-                  <span className="smallcaps text-[10px] text-parchment-300">Draw declined.</span>
-                )}
-                <button
-                  onClick={onOfferDraw}
-                  disabled={drawOfferStatus !== "idle"}
-                  className="px-4 py-1.5 rounded-full border border-gold/40 bg-gold/10 text-gold-leaf hover:bg-gold/20 hover:border-gold/70 transition text-xs font-display font-semibold tracking-wide disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {drawOfferStatus === "offering" ? "Offering…" : "Offer Draw"}
-                </button>
-                <button
-                  onClick={() => setConfirmingResign(true)}
-                  className="px-4 py-1.5 rounded-full border border-oxblood/40 bg-oxblood/10 text-oxblood-glow hover:bg-oxblood/20 hover:border-oxblood/70 transition text-xs font-display font-semibold tracking-wide"
-                >
-                  Resign
-                </button>
-              </div>
-            )}
           </div>
-          {/* Reserve a fixed slot for the hint so its appearance/disappearance
-              doesn't push the board down. The plate fades in when there's a hint. */}
-          <div className="min-h-[3.25rem]">
-            {hint && (
-              <div
-                role="status"
-                aria-live="polite"
-                className={
-                  "plate p-3 px-4 flex items-center gap-3 " +
-                  (hint.tone === "warn"
-                    ? "border-oxblood-glow/60 bg-oxblood/15"
-                    : "border-gold/40 bg-gold/10")
-                }
-              >
-                <span aria-hidden="true" className="text-gold-leaf font-display font-bold text-xl leading-none">!</span>
-                <span className="font-display text-[15px] text-parchment">
-                  {hint.text}
-                </span>
-              </div>
-            )}
-          </div>
-          <div className="grid sm:grid-cols-[minmax(0,1fr)_8.5rem] gap-3 sm:gap-4 items-stretch">
-            <Board
-              board={virtualBoard ?? game.board}
-              legalMoves={game.board.turn === myColor && !premovePending ? moves : premoveOptions}
-              orientation={myColor}
-              onMove={handleMove}
-              myColor={myColor}
-              visual={{ ...(visual ?? {}), highlightSquares: forcedSquares }}
-              lastMove={lastMove}
-              disabled={!!game.result || premovePending}
-              premoveMode={premoveMode}
-              premoves={validPremoves}
-              onCancelPremove={cancelPremove}
+        )}
+        <div
+          className="grid min-h-0 flex-1 gap-y-2 lg:grid-cols-[280px_minmax(0,1fr)] lg:gap-x-6"
+          style={railHeightStyle}
+        >
+          <aside className="hidden min-h-0 gap-3 overflow-hidden lg:grid lg:h-[var(--board-height)] lg:grid-rows-[auto_minmax(0,1fr)_auto] lg:self-start lg:py-[3.25rem]">
+            <DrawbackCard drawback={opponentDrawback} revealed={!!game.result} />
+            <div className="hidden lg:block" />
+            <DrawbackCard
+              drawback={myDrawback}
+              progress={myDrawback.progress?.(myState, myCtx) ?? null}
             />
-            {clockEnabled && (
-              <div className="grid grid-cols-2 sm:grid-cols-1 sm:grid-rows-[auto_1fr_auto] gap-3 sm:h-full">
+          </aside>
+          <div className="flex min-h-0 flex-col gap-3 sm:flex-row sm:items-stretch">
+            <div ref={boardShellRef} className="min-h-0 min-w-0 flex-1">
+              <div data-board-measure className={`mx-auto w-full ${boardFitClass}`}>
+                <BoardPlayerRow
+                  board={boardForDisplay}
+                  playerColor={myColor === "w" ? "b" : "w"}
+                  myColor={myColor}
+                  name={`${difficulty[0].toUpperCase()}${difficulty.slice(1)} Bot`}
+                  elo={BOT_ELO[difficulty]}
+                />
+                <Board
+                  board={boardForDisplay}
+                  legalMoves={
+                    isReviewingHistory
+                      ? []
+                      : game.board.turn === myColor && !premovePending
+                      ? moves
+                      : premoveOptions
+                  }
+                  orientation={myColor}
+                  onMove={handleMove}
+                  myColor={myColor}
+                  visual={isReviewingHistory ? undefined : { ...(visual ?? {}), highlightSquares: forcedSquares }}
+                  lastMove={lastMoveForDisplay}
+                  disabled={!!game.result || premovePending || isReviewingHistory}
+                  premoveMode={!isReviewingHistory && premoveMode}
+                  premoves={isReviewingHistory ? [] : validPremoves}
+                  onCancelPremove={cancelPremove}
+                />
+                <BoardPlayerRow
+                  board={boardForDisplay}
+                  playerColor={myColor}
+                  myColor={myColor}
+                  name="You"
+                  elo={playerElo}
+                />
+              </div>
+            </div>
+            <div
+              className={
+                "hidden min-h-0 overflow-hidden gap-3 sm:grid sm:h-[var(--board-height)] sm:w-52 sm:shrink-0 " +
+                (clockEnabled ? "sm:grid-rows-[auto_minmax(0,1fr)_auto]" : "sm:grid-rows-[minmax(0,1fr)]")
+              }
+              style={railHeightStyle}
+            >
+              {clockEnabled && (
                 <ClockPill
-                  label="Opponent"
                   ms={myColor === "w" ? blackMs : whiteMs}
                   active={!game.result && game.board.turn !== myColor}
                 />
-                <div className="hidden sm:block" />
+              )}
+              <MoveList
+                moves={game.board.history}
+                currentPly={currentHistoryPly}
+                onPlyChange={handleHistoryPlyChange}
+                compact
+                showHeader={false}
+                footer={historyActions}
+              />
+              {clockEnabled && (
                 <ClockPill
-                  label="You"
                   ms={myColor === "w" ? whiteMs : blackMs}
                   active={!game.result && game.board.turn === myColor}
                 />
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
-        <aside className="space-y-4">
-          <DrawbackCard
-            drawback={myDrawback}
-            progress={myDrawback.progress?.(myState, myCtx) ?? null}
-          />
-          <DrawbackCard drawback={opponentDrawback} revealed={!!game.result} />
-          <MoveList moves={game.board.history} />
-        </aside>
       </div>
 
       {game.result && (
@@ -612,56 +748,13 @@ function GamePage() {
   );
 }
 
-function MaterialBar({ board, myColor }: { board: BoardState; myColor: Color }) {
-  const VAL: Record<string, number> = { p: 1, n: 3, b: 3, r: 5, q: 9, k: 0 };
-  const START: Record<string, number> = { p: 8, n: 2, b: 2, r: 2, q: 1, k: 1 };
-  const counts: Record<Color, Record<string, number>> = {
-    w: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
-    b: { p: 0, n: 0, b: 0, r: 0, q: 0, k: 0 },
-  };
-  for (const p of board.pieces) {
-    if (!p) continue;
-    counts[p.color][p.type]++;
-  }
-  const opp: Color = myColor === "w" ? "b" : "w";
-  let myAdv = 0;
-  for (const t of ["p", "n", "b", "r", "q"]) {
-    myAdv += (counts[myColor][t] - counts[opp][t]) * VAL[t];
-  }
-  const myCaptured: string[] = [];
-  const oppCaptured: string[] = [];
-  for (const t of ["q", "r", "b", "n", "p"]) {
-    const myLost = Math.max(0, START[t] - counts[myColor][t]);
-    const oppLost = Math.max(0, START[t] - counts[opp][t]);
-    const symMap: Record<string, string> = { p: "♟", n: "♞", b: "♝", r: "♜", q: "♛" };
-    for (let i = 0; i < oppLost; i++) myCaptured.push(symMap[t]);
-    for (let i = 0; i < myLost; i++) oppCaptured.push(symMap[t]);
-  }
-  const label = myAdv === 0 ? "even" : myAdv > 0 ? `+${myAdv}` : `${myAdv}`;
-  return (
-    <div className="plate p-2 px-3 flex items-center justify-between text-sm">
-      <div className="flex items-center gap-2 min-w-0">
-        <span className="smallcaps text-[10px] text-parchment-400">You</span>
-        <span className="text-parchment-200 truncate font-mono text-base leading-none">{myCaptured.join("")}</span>
-      </div>
-      <span className={"font-mono font-semibold text-base " + (myAdv > 0 ? "text-gold-leaf" : myAdv < 0 ? "text-oxblood-glow" : "text-parchment-400")}>
-        {label}
-      </span>
-      <div className="flex items-center gap-2 min-w-0 justify-end">
-        <span className="text-parchment-200 truncate font-mono text-base leading-none">{oppCaptured.join("")}</span>
-        <span className="smallcaps text-[10px] text-parchment-400">Opp</span>
-      </div>
-    </div>
-  );
-}
-
-function ClockPill({ ms, active }: { label: string; ms: number; active: boolean }) {
+function ClockPill({ ms, active }: { ms: number; active: boolean }) {
   const low = ms < 30000;
   const critical = ms < 10000;
   return (
     <div
       className={
-        "plate px-3 py-1 flex items-center justify-center transition " +
+        "plate p-3 flex items-center justify-center transition " +
         (active
           ? "border-gold/70 bg-gold/10 shadow-leaf"
           : "opacity-70")
@@ -669,7 +762,7 @@ function ClockPill({ ms, active }: { label: string; ms: number; active: boolean 
     >
       <span
         className={
-          "font-mono text-xl sm:text-2xl tabular-nums font-semibold " +
+          "font-mono text-xl tabular-nums font-semibold " +
           (critical
             ? "text-oxblood-glow"
             : low
